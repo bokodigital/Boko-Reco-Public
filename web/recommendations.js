@@ -59,19 +59,23 @@ function bundlePricing(items, discountPct = 0) {
 
 function buildPrompt(type, candidates, anchor) {
   const sys =
-    "You are a merchandising assistant for an e-commerce store. Given an anchor product " +
-    "and a candidate list, choose and order the products most worth recommending to a " +
-    "shopper viewing the anchor. Respond ONLY with JSON: {\"ids\":[<id>,<id>,...]}.";
+    "You are a fashion merchandising stylist for an e-commerce store. Given an anchor product " +
+    "and a candidate list, choose and order the products that best COMPLEMENT the anchor to " +
+    "complete an outfit or look. Strongly prefer products from DIFFERENT categories than the anchor " +
+    "(e.g. a jacket should be paired with bottoms, footwear, accessories, or base layers — not more jackets). " +
+    "Never recommend near-duplicates of the anchor or the same item in another colour. " +
+    "Respond ONLY with JSON: {\"ids\":[<id>,<id>,...]}.";
   const user = {
     anchor: anchor
-      ? { id: anchor.id, title: anchor.title, price: anchor.price, category: anchor.category }
+      ? { id: anchor.id, title: anchor.title, price: anchor.price, category: anchor.category, tags: anchor.tags || [] }
       : null,
     candidates: candidates.map((p) => ({
-      id: p.id, title: p.title, price: p.price, category: p.category, orders: p.orders, views: p.views,
+      id: p.id, title: p.title, price: p.price, category: p.category, tags: p.tags || [], orders: p.orders, views: p.views,
     })),
     guidance:
-      "Recommend products that genuinely complement or appeal to a buyer of the anchor — " +
-      "mix complementary items and strong sellers; avoid near-duplicates of the anchor.",
+      "All candidates are in stock. Build a complementary set around the anchor — favour variety across " +
+      "categories and collections. Do not just return more items from the anchor's own category. " +
+      "Use tags and titles to judge style, colour, and occasion fit.",
   };
   return { sys, userStr: JSON.stringify(user) };
 }
@@ -126,10 +130,25 @@ async function refineWithLLM({ candidates, anchor }) {
 }
 
 async function recommend({ products, anchor = null, limit = 8, useLLM = true }) {
-  const heuristic = rankHeuristic("recommended", products, anchor).slice(0, Math.max(limit, 12));
-  let ordered = heuristic;
+  const ranked = rankHeuristic("recommended", products, anchor);
+  const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
+  const pool = [];
+  const catCount = {};
+  for (const p of ranked) {
+    if (pool.length >= 30) break;
+    const pCat = String(p.category || "").toLowerCase();
+    const isSameCat = aCat && pCat === aCat;
+    const cap = isSameCat ? 2 : 4;
+    const count = catCount[pCat] || 0;
+    if (count < cap) {
+      pool.push(p);
+      catCount[pCat] = count + 1;
+    }
+  }
+  const candidates = pool.length ? pool : ranked.slice(0, Math.max(limit, 12));
+  let ordered = candidates;
   if (useLLM) {
-    const refined = await refineWithLLM({ candidates: heuristic, anchor });
+    const refined = await refineWithLLM({ candidates, anchor });
     if (refined && refined.length) ordered = refined;
   }
   return ordered.slice(0, limit);

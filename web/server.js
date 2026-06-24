@@ -133,12 +133,7 @@ app.get("/proxy/recommend", async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
     const atype = (req.query.atype || "").trim();
     const anum = (req.query.anchor || "").trim();
-    let products = await loadProducts(shop, token);
-    if (atype) {
-      const same = await loadProducts(shop, token, 60, atype);
-      const seen = new Set(same.map((p) => p.id));
-      products = same.concat(products.filter((p) => !seen.has(p.id)));
-    }
+    let products = await loadProducts(shop, token, 250);
     const found = anum ? products.find((p) => p.id.endsWith(anum)) : null;
     const anchor = found || ((atype || req.query.atitle) ? {
       id: "anchor:" + anum,
