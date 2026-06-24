@@ -153,6 +153,29 @@ function shopFromSessionToken(idToken) {
   } catch (e) { return null; }
 }
 
+async function tokenExchange(shop, idToken) {
+  try {
+    const r = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: API_KEY, client_secret: API_SECRET,
+        grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+        subject_token: idToken,
+        subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+        requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token",
+      }),
+    }).then((x) => x.json());
+    if (!r || !r.access_token) return null;
+    await setToken(shop, r.access_token);
+    try {
+      await gql(shop, r.access_token,
+        `mutation($u:URL!){ webhookSubscriptionCreate(topic: APP_UNINSTALLED, webhookSubscription:{ callbackUrl:$u, format: JSON }){ userErrors{ message } } }`,
+        { u: HOST + "/webhooks/app_uninstalled" });
+    } catch (e) {}
+    return r.access_token;
+  } catch (e) { return null; }
+}
+
 async function loadStats(shop, token, days) {
   const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
   const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity discountedTotalSet{ shopMoney{ amount currencyCode } } customAttributes{ key value } } } } } } } }`;
@@ -182,9 +205,11 @@ async function loadStats(shop, token, days) {
 app.get("/stats", async (req, res) => {
   res.set("Content-Type", "application/json");
   try {
-    const shop = shopFromSessionToken((req.headers.authorization || "").replace(/^Bearer /, ""));
+    const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
+    const shop = shopFromSessionToken(idToken);
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
-    const token = await getToken(shop);
+    let token = await getToken(shop);
+    if (!token) token = await tokenExchange(shop, idToken);
     if (!token) return res.status(200).send(JSON.stringify({ error: "not installed", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
     const days = Math.min(parseInt(req.query.days || "90", 10), 365);
     res.status(200).send(JSON.stringify(await loadStats(shop, token, days)));
