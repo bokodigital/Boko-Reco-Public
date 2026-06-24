@@ -1,0 +1,71 @@
+Make these edits to the existing files in this repl. Apply exactly as written, do not reformat or change anything else, and do NOT run or deploy — just save the files.
+
+==== FILE: recommendations.js ====
+
+STEP 1 — Insert these lines immediately BEFORE the existing line that reads: const HEURISTIC = {
+
+const STOP = new Set(["the","a","an","and","or","for","with","of","in","to","by","on","womens","women","mens","men","size","new"]);
+function tokenize(s) {
+  return String(s || "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w));
+}
+
+STEP 2 — Replace the entire existing recommended(products, anchor) method (the first method inside HEURISTIC) with this:
+
+  recommended(products, anchor) {
+    const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
+    const aWords = anchor ? tokenize(anchor.title) : [];
+    const aTags = anchor && anchor.tags ? anchor.tags.map((t) => String(t).toLowerCase()) : [];
+    const aPrice = anchor && anchor.price ? Number(anchor.price) : 0;
+    return products
+      .filter((p) => !anchor || p.id !== anchor.id)
+      .map((p) => {
+        let score = 0;
+        if (anchor) {
+          if (aCat && String(p.category || "").toLowerCase() === aCat) score += 100;
+          const pWords = tokenize(p.title);
+          score += pWords.filter((w) => aWords.includes(w)).length * 12;
+          const pTags = (p.tags || []).map((t) => String(t).toLowerCase());
+          score += pTags.filter((t) => aTags.includes(t)).length * 8;
+          if (aPrice > 0 && p.price > 0) score += Math.max(0, 6 - (Math.abs(p.price - aPrice) / aPrice) * 6);
+        }
+        score += (p.orders || 0) * 0.01 + (p.views || 0) * 0.005;
+        return { p, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.p);
+  },
+
+==== FILE: server.js ====
+
+STEP 3 — Update the loadProducts function: (a) add a fourth parameter productType = "" ; (b) add the field tags to the products GraphQL query node fields (next to vendor); (c) add tags: n.tags || [] to each returned product object; (d) when productType is non-empty, fetch only that product type by appending a product_type filter to the existing status:active query string — first sanitize productType by removing any character that is not a letter, number, space, ampersand or hyphen, then wrap the sanitized value in single-quote characters in the query. Keep the variants selection, the variantId-and-available filter, and the orders/views fields exactly as they are.
+
+STEP 4 — Inside the app.get("/proxy/recommend", ...) handler, replace these four lines:
+
+    const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
+    const products = await loadProducts(shop, token);
+    const anchor = req.query.anchor ? products.find((p) => p.id.endsWith(req.query.anchor)) : null;
+    const items = await recommend({ products, anchor, limit });
+
+with these lines:
+
+    const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
+    const atype = (req.query.atype || "").trim();
+    const anum = (req.query.anchor || "").trim();
+    let products = await loadProducts(shop, token);
+    if (atype) {
+      const same = await loadProducts(shop, token, 60, atype);
+      const seen = new Set(same.map((p) => p.id));
+      products = same.concat(products.filter((p) => !seen.has(p.id)));
+    }
+    const found = anum ? products.find((p) => p.id.endsWith(anum)) : null;
+    const anchor = found || ((atype || req.query.atitle) ? {
+      id: "anchor:" + anum,
+      title: req.query.atitle || "",
+      category: atype.toLowerCase(),
+      tags: (req.query.atags || "").split(",").map((s) => s.trim()).filter(Boolean),
+      price: parseFloat(req.query.aprice || "0") || 0,
+    } : null);
+    if (anum) products = products.filter((p) => !p.id.endsWith(anum));
+    const items = await recommend({ products, anchor, limit });
+
+Save both files. Do not run or deploy.

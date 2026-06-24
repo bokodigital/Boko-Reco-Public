@@ -108,14 +108,16 @@ function verifyProxy(query) {
   catch (e) { return false; }
 }
 
-async function loadProducts(shop, token, limit = 100) {
-  const query = `query($n:Int!){ products(first:$n, query:"status:active"){ edges{ node{ id title handle productType vendor featuredImage{url} variants(first:1){ edges{ node{ id price availableForSale } } } } } } }`;
+async function loadProducts(shop, token, limit = 100, productType = "") {
+  const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
+  const qstr = safe ? `status:active product_type:${safe}` : "status:active";
+  const query = `query($n:Int!){ products(first:$n, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags featuredImage{url} variants(first:1){ edges{ node{ id price availableForSale } } } } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
   return edges.map((e, i) => {
     const n = e.node, v = n.variants && n.variants.edges[0] && n.variants.edges[0].node;
     return { id: n.id, handle: n.handle, variantId: v && v.id, available: !!(v && v.availableForSale),
-      title: n.title, vendor: n.vendor, category: (n.productType || "").toLowerCase(),
+      title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
       price: v ? parseFloat(v.price) : 0, img: (n.featuredImage && n.featuredImage.url) || "",
       orders: Math.max(0, limit - i) * 3, views: 0 };
   }).filter((p) => p.variantId && p.available);
@@ -129,8 +131,23 @@ app.get("/proxy/recommend", async (req, res) => {
     const token = await getToken(shop);
     if (!token) return res.status(200).send(JSON.stringify({ items: [], error: "app not installed for shop" }));
     const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
-    const products = await loadProducts(shop, token);
-    const anchor = req.query.anchor ? products.find((p) => p.id.endsWith(req.query.anchor)) : null;
+    const atype = (req.query.atype || "").trim();
+    const anum = (req.query.anchor || "").trim();
+    let products = await loadProducts(shop, token);
+    if (atype) {
+      const same = await loadProducts(shop, token, 60, atype);
+      const seen = new Set(same.map((p) => p.id));
+      products = same.concat(products.filter((p) => !seen.has(p.id)));
+    }
+    const found = anum ? products.find((p) => p.id.endsWith(anum)) : null;
+    const anchor = found || ((atype || req.query.atitle) ? {
+      id: "anchor:" + anum,
+      title: req.query.atitle || "",
+      category: atype.toLowerCase(),
+      tags: (req.query.atags || "").split(",").map((s) => s.trim()).filter(Boolean),
+      price: parseFloat(req.query.aprice || "0") || 0,
+    } : null);
+    if (anum) products = products.filter((p) => !p.id.endsWith(anum));
     const items = await recommend({ products, anchor, limit });
     res.status(200).send(JSON.stringify({ items }));
   } catch (e) {

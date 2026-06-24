@@ -7,14 +7,32 @@
 //   provider "anthropic" -> Claude messages API (https://api.anthropic.com/v1/messages)
 //   Auto-detected from the URL if LLM_PROVIDER unset. Fails safe to the heuristic order.
 
+const STOP = new Set(["the","a","an","and","or","for","with","of","in","to","by","on","womens","women","mens","men","size","new"]);
+function tokenize(s) {
+  return String(s || "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.has(w));
+}
+
 const HEURISTIC = {
   // General "recommended": popular products, boosted when they share the anchor's category.
   recommended(products, anchor) {
+    const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
+    const aWords = anchor ? tokenize(anchor.title) : [];
+    const aTags = anchor && anchor.tags ? anchor.tags.map((t) => String(t).toLowerCase()) : [];
+    const aPrice = anchor && anchor.price ? Number(anchor.price) : 0;
     return products
       .filter((p) => !anchor || p.id !== anchor.id)
       .map((p) => {
-        const rel = anchor && p.category === anchor.category ? 1.3 : 1;
-        return { p, score: rel * ((p.orders || 0) * 0.6 + (p.views || 0) * 0.2) };
+        let score = 0;
+        if (anchor) {
+          if (aCat && String(p.category || "").toLowerCase() === aCat) score += 100;
+          const pWords = tokenize(p.title);
+          score += pWords.filter((w) => aWords.includes(w)).length * 12;
+          const pTags = (p.tags || []).map((t) => String(t).toLowerCase());
+          score += pTags.filter((t) => aTags.includes(t)).length * 8;
+          if (aPrice > 0 && p.price > 0) score += Math.max(0, 6 - (Math.abs(p.price - aPrice) / aPrice) * 6);
+        }
+        score += (p.orders || 0) * 0.01 + (p.views || 0) * 0.005;
+        return { p, score };
       })
       .sort((a, b) => b.score - a.score)
       .map((x) => x.p);
