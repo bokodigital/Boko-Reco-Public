@@ -1,0 +1,33 @@
+# Render blueprint — one-click hosting for the Boko Reco app backend.
+# In Render: New + → Blueprint → connect the repo containing this file.
+# Render reads this and provisions the web service + a persistent disk for sessions.
+# After it deploys, fill the "sync: false" env vars in the dashboard.
+
+services:
+  - type: web
+    name: boko-reco-app
+    runtime: node
+    plan: starter          # "starter" (paid) is required for a persistent disk
+    buildCommand: cd web && npm install
+    startCommand: cd web && npm start
+    envVars:
+      - key: SHOPIFY_API_KEY
+        sync: false         # paste from Partner dashboard
+      - key: SHOPIFY_API_SECRET
+        sync: false         # paste from Partner dashboard
+      - key: SCOPES
+        value: read_products,read_orders
+      - key: HOST
+        sync: false         # set to your Render URL, e.g. https://boko-reco-app.onrender.com
+      - key: SESSION_DB_PATH
+        value: /var/data/database.sqlite
+      - key: LLM_API_URL
+        sync: false         # optional, e.g. https://api.openai.com/v1/chat/completions
+      - key: LLM_API_KEY
+        sync: false         # optional
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+    disk:
+      name: reco-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boko AI Recommendations — Settings</title>
+<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f6f6f7;margin:0;color:#1a1a1a}
+  .wrap{max-width:680px;margin:32px auto;padding:0 16px}
+  .card{background:#fff;border:1px solid #e1e3e5;border-radius:12px;padding:22px;margin-bottom:16px}
+  h1{font-size:20px;margin:0 0 4px}.sub{color:#6d7175;font-size:13px;margin:0 0 18px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px}
+  input,select{width:100%;padding:9px 11px;border:1px solid #c9cccf;border-radius:8px;font-size:14px}
+  .row{display:flex;gap:14px}.row>div{flex:1}
+  button{margin-top:18px;background:#BFFC00;color:#0A0A0A;border:none;border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer}
+  .ok{color:#0a7d33;font-size:13px;margin-left:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>AI Recommendations — settings</h1>
+    <p class="sub">Defaults for the storefront widget. Merchants can still override per-block in the theme editor.</p>
+    <div class="row">
+      <div><label>Products per row</label><input type="number" id="perRow" min="2" max="6" value="4"></div>
+      <div><label>Bundle discount (%)</label><input type="number" id="bundleDiscount" min="0" max="50" value="10"></div>
+    </div>
+    <label>Widget heading</label>
+    <input type="text" id="title" value="You might also like">
+    <label>Default recommendation type</label>
+    <select id="defType">
+      <option value="purchased">Most purchased</option>
+      <option value="viewed">Most viewed</option>
+      <option value="upsell" selected>Up-sells</option>
+      <option value="downsell">Down-sells</option>
+    </select>
+    <button id="save">Save settings<span class="ok" id="ok"></span></button>
+  </div>
+</div>
+<script>
+  // App Bridge session token is attached to admin API calls.
+  var params = new URLSearchParams(location.search);
+  function api(path, opts){ opts=opts||{}; return fetch(path, opts).then(function(r){return r.json();}); }
+  api("/api/settings").then(function(s){
+    if(!s) return;
+    document.getElementById("perRow").value=s.perRow;
+    document.getElementById("bundleDiscount").value=s.bundleDiscount;
+    document.getElementById("title").value=s.title;
+    if(s.tabs && s.tabs[0]) document.getElementById("defType").value=s.tabs[0];
+  });
+  document.getElementById("save").addEventListener("click", function(){
+    var body={
+      perRow:+document.getElementById("perRow").value,
+      bundleDiscount:+document.getElementById("bundleDiscount").value,
+      title:document.getElementById("title").value,
+      tabs:[document.getElementById("defType").value,"purchased","viewed","upsell","downsell"]
+    };
+    api("/api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+      .then(function(){ document.getElementById("ok").textContent="✓ Saved"; setTimeout(function(){document.getElementById("ok").textContent="";},1800); });
+  });
+</script>
+</body>
+</html>

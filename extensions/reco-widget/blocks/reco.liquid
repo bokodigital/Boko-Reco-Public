@@ -1,0 +1,69 @@
+{% comment %}
+  Boko AI Recommendations — theme app extension block.
+  Merchants add this from the theme editor and configure it via the settings panel.
+  The widget fetches recommendations from the app proxy and renders product cards
+  with per-product add-to-cart and a bundle add-to-cart.
+{% endcomment %}
+
+<div
+  class="boko-reco"
+  data-boko-reco
+  data-proxy="{{ block.settings.proxy_url }}"
+  data-type="{{ block.settings.default_type }}"
+  data-per-row="{{ block.settings.per_row }}"
+  data-limit="{{ block.settings.limit }}"
+  data-bundle-discount="{{ block.settings.bundle_discount }}"
+  data-show-tabs="{{ block.settings.show_tabs }}"
+  data-title="{{ block.settings.title | escape }}"
+  {% if template contains 'product' %}data-anchor="{{ product.id }}"{% endif %}
+>
+  <div class="boko-reco__head">
+    <span class="boko-reco__pill">{{ block.settings.pill_text | default: 'AI Picked' }}</span>
+    <h2 class="boko-reco__title">{{ block.settings.title }}</h2>
+  </div>
+  <div class="boko-reco__tabs" data-reco-tabs></div>
+  <div class="boko-reco__grid" data-reco-grid></div>
+</div>
+
+<link rel="stylesheet" href="{{ 'reco.css' | asset_url }}">
+<script src="{{ 'reco.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "AI Recommendations",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Heading", "default": "You might also like" },
+    { "type": "text", "id": "pill_text", "label": "Badge text", "default": "AI Picked" },
+    {
+      "type": "select", "id": "default_type", "label": "Default recommendation type",
+      "options": [
+        { "value": "purchased", "label": "Most purchased" },
+        { "value": "viewed", "label": "Most viewed" },
+        { "value": "upsell", "label": "Up-sells" },
+        { "value": "downsell", "label": "Down-sells" }
+      ],
+      "default": "upsell"
+    },
+    { "type": "checkbox", "id": "show_tabs", "label": "Let shoppers switch type (show tabs)", "default": true },
+    {
+      "type": "range", "id": "per_row", "label": "Products per row",
+      "min": 2, "max": 6, "step": 1, "default": 4
+    },
+    {
+      "type": "range", "id": "limit", "label": "Number of products",
+      "min": 2, "max": 24, "step": 1, "default": 8
+    },
+    {
+      "type": "range", "id": "bundle_discount", "label": "Bundle discount %",
+      "min": 0, "max": 50, "step": 1, "default": 10
+    },
+    {
+      "type": "text", "id": "proxy_url", "label": "App proxy path",
+      "default": "/apps/reco/recommend",
+      "info": "Matches the App Proxy subpath you configured in the Partner dashboard."
+    }
+  ],
+  "presets": [{ "name": "AI Recommendations" }]
+}
+{% endschema %}

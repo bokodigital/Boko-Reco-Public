@@ -1,0 +1,10 @@
+api_version = "2024-10"
+
+[[extensions]]
+name = "Boko AI Recommendations"
+handle = "reco-widget"
+type = "theme"
+
+# This is a Theme App Extension. After `shopify app deploy`, merchants add the
+# "AI Recommendations" block to any template (product, cart, home) from the
+# theme editor — no code editing required.

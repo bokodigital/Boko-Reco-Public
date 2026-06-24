@@ -1,0 +1,22 @@
+run = "cd web && npm install && npm start"
+entrypoint = "web/server.js"
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+SCOPES = "read_products,read_orders"
+LLM_MODEL = "gpt-4o-mini"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[agent]
+expertMode = true
+
+[deployment]
+deploymentTarget = "cloudrun"
+build = ["sh", "-c", "cd web && npm install"]
+run = ["sh", "-c", "cd web && node server.js"]

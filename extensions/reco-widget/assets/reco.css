@@ -1,0 +1,46 @@
+/* Boko AI Recommendations — storefront styles (Boko brand) */
+.boko-reco{--lime:#BFFC00;--black:#0A0A0A;--line:#E5E7EB;--muted:#667085;--lilac:#F8F9FC;
+  font-family:"Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  color:var(--black);max-width:1200px;margin:32px auto;padding:0 16px}
+.boko-reco *{box-sizing:border-box}
+.boko-reco__head{margin-bottom:14px}
+.boko-reco__pill{display:inline-block;background:var(--lime);color:var(--black);padding:5px 13px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.9px;text-transform:uppercase}
+.boko-reco__title{margin:8px 0 0;font-size:26px;font-weight:900;letter-spacing:-.5px;line-height:1.15}
+.boko-reco__tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.boko-reco__tab{border:1px solid var(--line);background:#fff;color:var(--black);padding:9px 15px;border-radius:99px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px}
+.boko-reco__tab:hover{border-color:var(--black)}
+.boko-reco__tab.is-on{background:var(--black);color:#fff;border-color:var(--black)}
+.boko-reco__dot{width:7px;height:7px;border-radius:50%;background:var(--lime)}
+.boko-reco__grid{display:grid;gap:16px}
+.boko-reco__loading{grid-column:1/-1;color:var(--muted);padding:24px;text-align:center}
+.boko-reco__card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;transition:.12s}
+.boko-reco__card:hover{box-shadow:0 2px 20px rgba(0,0,0,.07);transform:translateY(-2px)}
+.boko-reco__imgwrap{position:relative;aspect-ratio:1/1;background:var(--lilac);overflow:hidden}
+.boko-reco__imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.boko-reco__badge{position:absolute;top:10px;left:10px;background:var(--lime);color:var(--black);font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:4px 9px;border-radius:99px}
+.boko-reco__bsel{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:99px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer}
+.boko-reco__bsel input{accent-color:#7aa800;margin:0}
+.boko-reco__cbody{padding:12px 13px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.boko-reco__vendor{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.boko-reco__ctitle{font-size:14px;font-weight:600;line-height:1.3;min-height:36px}
+.boko-reco__metric{font-size:11px;color:var(--muted)}
+.boko-reco__price{font-size:18px;font-weight:800;letter-spacing:-.3px}
+.boko-reco__atc{margin-top:auto;border:none;background:var(--lime);color:var(--black);font:inherit;font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:12px;padding:11px;border-radius:10px;cursor:pointer}
+.boko-reco__atc:hover{filter:brightness(1.04)}
+.boko-reco__atc.is-added{background:var(--black);color:#fff}
+/* bundle bar */
+.boko-reco__bundlebar{position:fixed;left:0;right:0;bottom:0;background:#0A0A0A;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:0 -6px 30px rgba(0,0,0,.18);transform:translateY(110%);transition:transform .25s;z-index:9999;
+  font-family:"Poppins",-apple-system,sans-serif}
+.boko-reco__bundlebar.is-show{transform:translateY(0)}
+.boko-reco__bthumbs{display:flex;align-items:center}
+.boko-reco__bthumbs img{width:42px;height:42px;border-radius:8px;object-fit:cover;border:2px solid #0A0A0A;margin-left:-10px;background:#222}
+.boko-reco__bthumbs img:first-child{margin-left:0}
+.boko-reco__btext b{font-size:14px}
+.boko-reco__btext span{display:block;font-size:12px;color:#b9c0a0}
+.boko-reco__save{color:#BFFC00;font-weight:700}
+.boko-reco__bspacer{flex:1}
+.boko-reco__btotal{font-size:22px;font-weight:900;letter-spacing:-.5px}
+.boko-reco__btotal small{font-size:13px;color:#9aa3b2;text-decoration:line-through;font-weight:600;margin-right:8px}
+.boko-reco__badd{border:none;background:#BFFC00;color:#0A0A0A;font:inherit;font-weight:800;text-transform:uppercase;letter-spacing:.5px;font-size:14px;padding:13px 22px;border-radius:12px;cursor:pointer}
+.boko-reco__bclear{background:transparent;border:1px solid #3a3a3a;color:#cfcfcf;border-radius:10px;padding:11px 14px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+@media(max-width:600px){.boko-reco__grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}

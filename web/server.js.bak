@@ -1,0 +1,28 @@
+import express from "express";
+import { recommend } from "./recommendations.js";
+const PORT = parseInt(process.env.PORT || "3000", 10);
+const SHOP = (process.env.SHOP || "").replace(/^https?:\/\//, "");
+const TOKEN = process.env.SHOPIFY_ADMIN_TOKEN || "";
+const API = process.env.SHOPIFY_API_VERSION || "2024-10";
+const app = express();
+app.use((req, res, next) => { res.set("Access-Control-Allow-Origin", "*"); res.set("Access-Control-Allow-Methods", "GET,OPTIONS"); next(); });
+async function loadProducts(limit = 100) {
+  if (!SHOP || !TOKEN) throw new Error("Missing SHOP or SHOPIFY_ADMIN_TOKEN secret");
+  const query = `query($n:Int!){ products(first:$n){ edges{ node{ id title productType vendor featuredImage{url} variants(first:1){ edges{ node{ id price } } } } } } }`;
+  const r = await fetch(`https://${SHOP}/admin/api/${API}/graphql.json`, { method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": TOKEN }, body: JSON.stringify({ query, variables: { n: limit } }) });
+  const j = await r.json();
+  const edges = (j.data && j.data.products && j.data.products.edges) || [];
+  return edges.map((e, i) => { const n = e.node; const v = n.variants && n.variants.edges[0] && n.variants.edges[0].node;
+    return { id: n.id, variantId: v && v.id, title: n.title, vendor: n.vendor, category: (n.productType || "").toLowerCase(), price: v ? parseFloat(v.price) : 0, img: (n.featuredImage && n.featuredImage.url) || "", orders: Math.max(0, limit - i) * 3, views: 0 }; });
+}
+app.get("/recommend", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
+    const products = await loadProducts();
+    const anchor = req.query.anchor ? products.find((p) => p.id.endsWith(req.query.anchor)) : null;
+    const items = await recommend({ products, anchor, limit });
+    res.set("Content-Type", "application/json").status(200).send(JSON.stringify({ items }));
+  } catch (e) { console.error("[reco]", e.message); res.set("Content-Type", "application/json").status(200).send(JSON.stringify({ items: [], error: e.message })); }
+});
+app.get("/", (req, res) => res.send("Boko Reco app running (token mode). Try /recommend"));
+app.listen(PORT, () => console.log("Boko Reco token mode listening on " + PORT));

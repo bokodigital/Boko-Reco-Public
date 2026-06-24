@@ -1,0 +1,105 @@
+{% comment %}
+  Boko AI Recommendations — single "Recommended" rail, powered by your app (LLM-curated).
+  Calls the App Proxy /apps/reco/recommend. Requires the Boko app installed on the store.
+  Install: Edit code → Sections → Add a new section "boko-recommendations" → paste → Save
+           → Customize → Add section → "AI Recommendations".
+{% endcomment %}
+
+<style>
+.boko-reco{--ink:#2b2b2b;--muted:#8a8a8a;--line:#e6e6e6;--badge:#3f8f5f;
+  font-family:"Jost","Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);max-width:1240px;margin:40px auto;padding:0 16px}
+.boko-reco *{box-sizing:border-box}
+.boko-reco__title{text-align:center;font-weight:300;font-size:30px;letter-spacing:7px;text-transform:uppercase;margin:0 0 30px}
+.boko-reco__grid{display:grid;gap:8px}
+.boko-reco__loading{grid-column:1/-1;text-align:center;color:var(--muted);padding:24px}
+.boko-reco__card{position:relative;display:flex;flex-direction:column;background:#fff}
+.boko-reco__imgwrap{position:relative;aspect-ratio:3/4.1;overflow:hidden;background:#f3f1ee}
+.boko-reco__imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.boko-reco__bsel{position:absolute;top:10px;right:10px;z-index:3;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:99px;padding:3px 9px;font-size:11px;cursor:pointer;opacity:0;transition:opacity .2s}
+.boko-reco__card:hover .boko-reco__bsel{opacity:1}
+.boko-reco__bsel input{accent-color:var(--badge);margin:0}
+.boko-reco__atc{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;border:none;background:#1f1f1f;color:#fff;font:inherit;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;padding:12px;cursor:pointer;opacity:0;transform:translateY(6px);transition:.2s}
+.boko-reco__card:hover .boko-reco__atc{opacity:1;transform:translateY(0)}
+.boko-reco__atc.is-added{background:var(--badge)}
+.boko-reco__cbody{padding:14px 6px 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px}
+.boko-reco__ctitle{font-size:13px;letter-spacing:1.2px;text-transform:uppercase;font-weight:400}
+.boko-reco__vendor{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.boko-reco__price{font-size:15px}
+.boko-reco__bar{position:fixed;left:0;right:0;bottom:0;background:#1f1f1f;color:#fff;padding:13px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;transform:translateY(120%);transition:transform .25s;z-index:9999;font-family:"Jost",sans-serif}
+.boko-reco__bar.is-show{transform:translateY(0)}
+.boko-reco__bthumbs{display:flex}
+.boko-reco__bthumbs img{width:40px;height:40px;border-radius:4px;object-fit:cover;border:2px solid #1f1f1f;margin-left:-10px}
+.boko-reco__bthumbs img:first-child{margin-left:0}
+.boko-reco__btext b{font-size:14px;font-weight:500}.boko-reco__btext span{display:block;font-size:12px;color:#bdbdbd}
+.boko-reco__save{color:#7fd0a1}
+.boko-reco__bspacer{flex:1}
+.boko-reco__btotal{font-size:20px;font-weight:500}.boko-reco__btotal small{font-size:12px;color:#9a9a9a;text-decoration:line-through;margin-right:8px}
+.boko-reco__badd{border:none;background:#fff;color:#1f1f1f;font:inherit;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;padding:12px 22px;cursor:pointer}
+.boko-reco__bclear{background:transparent;border:1px solid #444;color:#ddd;padding:11px 14px;font:inherit;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+@media(max-width:600px){.boko-reco__grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+</style>
+
+<div class="boko-reco" data-boko-reco
+  data-proxy="{{ section.settings.proxy_url }}"
+  data-per-row="{{ section.settings.per_row }}"
+  data-limit="{{ section.settings.limit }}"
+  data-bundle-discount="{{ section.settings.bundle_discount }}"
+  {% if template contains 'product' %}data-anchor="{{ product.id }}"{% endif %}>
+  <h2 class="boko-reco__title">{{ section.settings.title }}</h2>
+  <div class="boko-reco__grid" data-reco-grid></div>
+</div>
+
+<script>
+(function(){
+  function el(h){var d=document.createElement("div");d.innerHTML=h.trim();return d.firstChild;}
+  function vnum(g){var m=String(g).match(/(\d+)$/);return m?m[1]:g;}
+  function init(root){
+    var proxy=root.getAttribute("data-proxy")||"/apps/reco/recommend";
+    var perRow=parseInt(root.getAttribute("data-per-row")||"4",10);
+    var limit=parseInt(root.getAttribute("data-limit")||"8",10);
+    var discount=parseFloat(root.getAttribute("data-bundle-discount")||"0");
+    var anchor=root.getAttribute("data-anchor")||"";
+    var grid=root.querySelector("[data-reco-grid]");
+    var bundle=[],ITEMS={},bar;
+    function money(n){return "$"+Number(n).toFixed(2);}
+    function getItems(){
+      var url=proxy+"?type=recommended&limit="+limit+(anchor?"&anchor="+encodeURIComponent(anchor):"");
+      return fetch(url,{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){return d.items||[];}).catch(function(){return [];});
+    }
+    function card(p){
+      var inB=bundle.indexOf(p.variantId)>=0;
+      var c=el("<div class='boko-reco__card'><div class='boko-reco__imgwrap'><label class='boko-reco__bsel'><input type='checkbox' "+(inB?"checked":"")+"> Bundle</label>"+(p.img?"<img loading='lazy' src='"+p.img+"' alt=''>":"")+"<button class='boko-reco__atc'>Add to cart</button></div><div class='boko-reco__cbody'><div class='boko-reco__vendor'>"+(p.vendor||"")+"</div><div class='boko-reco__ctitle'>"+p.title+"</div><div class='boko-reco__price'>"+money(p.price)+"</div></div></div>");
+      c.querySelector(".boko-reco__atc").addEventListener("click",function(){addToCart(p.variantId,this);});
+      c.querySelector("input").addEventListener("change",function(){toggleBundle(p);});
+      return c;
+    }
+    function load(){
+      grid.style.gridTemplateColumns="repeat("+perRow+",minmax(0,1fr))";
+      grid.innerHTML="<div class='boko-reco__loading'>Loading…</div>";
+      getItems().then(function(items){grid.innerHTML="";if(!items.length){grid.innerHTML="<div class='boko-reco__loading'>No recommendations yet.</div>";return;}items.forEach(function(p){if(p.variantId)grid.appendChild(card(p));});});
+    }
+    function addToCart(variantId,btn){fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[{id:vnum(variantId),quantity:1}]})}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){if(btn){btn.textContent="Added";btn.classList.add("is-added");setTimeout(function(){btn.textContent="Add to cart";btn.classList.remove("is-added");},1400);}document.dispatchEvent(new CustomEvent("boko:cart:added"));}).catch(function(){if(btn)btn.textContent="Try again";});}
+    function ensureBar(){if(bar)return bar;bar=el("<div class='boko-reco__bar'><div class='boko-reco__bthumbs' data-bt></div><div class='boko-reco__btext'><b data-bc>0 items</b><span data-bs></span></div><div class='boko-reco__bspacer'></div><div class='boko-reco__btotal'><small data-bcomp></small><span data-btt>$0.00</span></div><button class='boko-reco__bclear' data-bclear>Clear</button><button class='boko-reco__badd' data-badd>Add bundle to cart</button></div>");document.body.appendChild(bar);bar.querySelector("[data-bclear]").addEventListener("click",function(){bundle=[];ITEMS={};renderBundle();load();});bar.querySelector("[data-badd]").addEventListener("click",addBundle);return bar;}
+    function toggleBundle(p){var i=bundle.indexOf(p.variantId);if(i>=0){bundle.splice(i,1);delete ITEMS[p.variantId];}else{bundle.push(p.variantId);ITEMS[p.variantId]=p;}renderBundle();}
+    function renderBundle(){ensureBar();if(!bundle.length){bar.classList.remove("is-show");return;}var items=bundle.map(function(v){return ITEMS[v];});var sub=items.reduce(function(s,p){return s+Number(p.price);},0);var disc=sub*discount/100;bar.querySelector("[data-bt]").innerHTML=items.slice(0,6).map(function(p){return p.img?"<img src='"+p.img+"' alt=''>":"";}).join("");bar.querySelector("[data-bc]").textContent=items.length+(items.length===1?" item":" items")+" in bundle";bar.querySelector("[data-bs]").innerHTML=discount?"<span class='boko-reco__save'>Save "+money(disc)+" ("+discount+"%)</span>":"";bar.querySelector("[data-bcomp]").textContent=discount?money(sub):"";bar.querySelector("[data-btt]").textContent=money(sub-disc);bar.classList.add("is-show");}
+    function addBundle(){var items=bundle.map(function(v){return {id:vnum(v),quantity:1};});fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:items})}).then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(){document.dispatchEvent(new CustomEvent("boko:cart:added"));bundle=[];ITEMS={};renderBundle();load();});}
+    load();
+  }
+  function boot(){document.querySelectorAll("[data-boko-reco]").forEach(init);}
+  if(document.readyState!=="loading")boot();else document.addEventListener("DOMContentLoaded",boot);
+})();
+</script>
+
+{% schema %}
+{
+  "name": "AI Recommendations",
+  "settings": [
+    { "type": "text", "id": "title", "label": "Heading", "default": "You may also like" },
+    { "type": "range", "id": "per_row", "label": "Products per row", "min": 2, "max": 6, "step": 1, "default": 4 },
+    { "type": "range", "id": "limit", "label": "Number of products", "min": 2, "max": 24, "step": 1, "default": 8 },
+    { "type": "range", "id": "bundle_discount", "label": "Bundle discount %", "min": 0, "max": 50, "step": 1, "default": 10 },
+    { "type": "text", "id": "proxy_url", "label": "App proxy path", "default": "/apps/reco/recommend" }
+  ],
+  "presets": [{ "name": "AI Recommendations" }]
+}
+{% endschema %}
