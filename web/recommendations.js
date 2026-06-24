@@ -131,18 +131,28 @@ async function refineWithLLM({ candidates, anchor }) {
 
 async function recommend({ products, anchor = null, limit = 8, useLLM = true }) {
   const ranked = rankHeuristic("recommended", products, anchor);
-  const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
-  const pool = [];
-  const catCount = {};
+  const anchorCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
+  const bycat = new Map();
   for (const p of ranked) {
-    if (pool.length >= 30) break;
-    const pCat = String(p.category || "").toLowerCase();
-    const isSameCat = aCat && pCat === aCat;
-    const cap = isSameCat ? 2 : 4;
-    const count = catCount[pCat] || 0;
-    if (count < cap) {
+    const k = String(p.category || "_").toLowerCase();
+    if (!bycat.has(k)) bycat.set(k, []);
+    bycat.get(k).push(p);
+  }
+  const otherCats = [...bycat.keys()].filter((k) => k !== anchorCat);
+  const pool = [];
+  for (let round = 0; pool.length < 30; round++) {
+    let added = 0;
+    for (const cat of otherCats) {
+      if (pool.length >= 30) break;
+      const arr = bycat.get(cat);
+      if (arr && round < arr.length) { pool.push(arr[round]); added++; }
+    }
+    if (added === 0) break;
+  }
+  if (pool.length < Math.max(limit, 8) && bycat.has(anchorCat)) {
+    for (const p of bycat.get(anchorCat)) {
+      if (pool.length >= Math.max(limit, 8)) break;
       pool.push(p);
-      catCount[pCat] = count + 1;
     }
   }
   const candidates = pool.length ? pool : ranked.slice(0, Math.max(limit, 12));
