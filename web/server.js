@@ -75,33 +75,61 @@ async function activeSubscription(shop, token) {
 
 async function startSubscription(shop, token) {
   const returnUrl = HOST + "/billing/callback?shop=" + encodeURIComponent(shop);
-  const mutation = `mutation($input: AppSubscriptionInput!) {
-    appSubscriptionCreate(name: $input.name, returnUrl: $input.returnUrl, test: $input.test, trialDays: $input.trialDays, lineItems: $input.lineItems) {
-      confirmationUrl
-      userErrors { message }
-    }
-  }`;
-  const cleanMutation = `mutation {
-    appSubscriptionCreate(
-      name: "${PLAN_NAME.replace(/"/g, '\\"')}"
-      returnUrl: "${returnUrl}"
-      test: ${BILLING_TEST}
-      trialDays: ${TRIAL_DAYS}
-      lineItems: [{
-        plan: {
-          appRecurringPricingDetails: {
-            price: { amount: "${PLAN_PRICE}", currencyCode: ${PLAN_CURRENCY} }
-            interval: EVERY_30_DAYS
-          }
-        }
-      }]
+  const mutation = `
+    mutation appSubscriptionCreate(
+      $name: String!
+      $returnUrl: URL!
+      $test: Boolean
+      $trialDays: Int
+      $lineItems: [AppSubscriptionLineItemInput!]!
     ) {
-      confirmationUrl
-      userErrors { message }
+      appSubscriptionCreate(
+        name: $name
+        returnUrl: $returnUrl
+        test: $test
+        trialDays: $trialDays
+        lineItems: $lineItems
+      ) {
+        confirmationUrl
+        userErrors { field message }
+      }
     }
-  }`;
-  const j = await gql(shop, token, cleanMutation, {});
-  return (j.data && j.data.appSubscriptionCreate && j.data.appSubscriptionCreate.confirmationUrl) || null;
+  `;
+  const variables = {
+    name: PLAN_NAME,
+    returnUrl,
+    test: Boolean(BILLING_TEST),
+    trialDays: TRIAL_DAYS,
+    lineItems: [{
+      plan: {
+        appRecurringPricingDetails: {
+          price: { amount: String(PLAN_PRICE), currencyCode: String(PLAN_CURRENCY) },
+          interval: "EVERY_30_DAYS",
+        },
+      },
+    }],
+  };
+  const j = await gql(shop, token, mutation, variables);
+  if (j.errors && j.errors.length) {
+    console.error("[billing] appSubscriptionCreate top-level errors:", JSON.stringify(j.errors));
+  }
+  const result = j.data && j.data.appSubscriptionCreate;
+  if (result && result.userErrors && result.userErrors.length) {
+    console.error("[billing] appSubscriptionCreate userErrors:", JSON.stringify(result.userErrors));
+  }
+  if (!result || !result.confirmationUrl) {
+    console.error("[billing] appSubscriptionCreate full response:", JSON.stringify(j));
+  }
+  const userErrorMsg = (result && result.userErrors && result.userErrors.length)
+    ? result.userErrors.map((e) => e.message).join("; ")
+    : null;
+  const topErrorMsg = (j.errors && j.errors.length)
+    ? j.errors.map((e) => e.message).join("; ")
+    : null;
+  return {
+    confirmationUrl: (result && result.confirmationUrl) || null,
+    error: userErrorMsg || topErrorMsg || null,
+  };
 }
 
 async function billingOK(shop, token) {
@@ -154,7 +182,7 @@ app.get("/auth/callback", async (req, res) => {
     } catch (e) {}
     // Billing gate: redirect to subscription confirmation if not yet billed
     if (BILLING_ON && !(await billingOK(shop, tok.access_token))) {
-      const confirmationUrl = await startSubscription(shop, tok.access_token);
+      const { confirmationUrl } = await startSubscription(shop, tok.access_token);
       if (confirmationUrl) return res.redirect(confirmationUrl);
     }
     // Open the embedded app in admin
@@ -171,8 +199,8 @@ app.get("/billing/start", async (req, res) => {
     if (!validShop(shop)) return res.status(400).send("Invalid shop");
     const token = await getToken(shop);
     if (!token) return res.redirect("/auth?shop=" + encodeURIComponent(shop));
-    const confirmationUrl = await startSubscription(shop, token);
-    if (!confirmationUrl) return res.status(500).send("Could not start subscription");
+    const { confirmationUrl, error } = await startSubscription(shop, token);
+    if (!confirmationUrl) return res.status(500).send("Could not start subscription" + (error ? ": " + error : ""));
     res.redirect(confirmationUrl);
   } catch (e) {
     res.status(500).send("Billing error: " + e.message);
