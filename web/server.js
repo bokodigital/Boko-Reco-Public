@@ -18,20 +18,22 @@
 
 import express from "express";
 import crypto from "crypto";
+import { readFileSync } from "fs";
 import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
 const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
-const SCOPES = process.env.SCOPES || "read_products,read_orders";
+const SCOPES = process.env.SCOPES || "read_products,read_orders,write_script_tags";
 const HOST = (process.env.HOST || "").replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();
+const STOREFRONT_JS = readFileSync(new URL("./storefront.js", import.meta.url), "utf8");
 
 // ---- token store (per shop) — handles both @replit/database return styles ----
 const k = (shop) => "shop:" + shop;
-async function rawTok(shop) { const r = await db.get(k(shop)); if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value : null; return r || null; } async function refreshExpiring(shop, t) { if (!t || !t.refresh_token) return t; try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "refresh_token", refresh_token: t.refresh_token }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || t.refresh_token, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return t; } async function migrateToken(shop, oldToken) { try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token: oldToken, subject_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", expiring: "1" }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || null, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return { access_token: oldToken }; } async function getToken(shop) { let t = await rawTok(shop); if (!t) return null; if (typeof t === "string") { t = await migrateToken(shop, t); } if (t.expires_at && Date.now() > (t.expires_at - 120000)) t = await refreshExpiring(shop, t); return (t && t.access_token) || null; } async function setToken(shop, token) { await db.set(k(shop), token); }
+async function rawTok(shop) { const r = await db.get(k(shop)); if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value : null; return r || null; } async function refreshExpiring(shop, t) { if (!t || !t.refresh_token) return t; try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "refresh_token", refresh_token: t.refresh_token }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || t.refresh_token, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return t; } async function migrateToken(shop, oldToken) { try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token: oldToken, subject_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", expiring: "1" }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || null, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return { access_token: oldToken }; } async function getToken(shop) { let t = await rawTok(shop); if (!t) return null; if (typeof t === "string") { t = await migrateToken(shop, t); } if (t.expires_at && Date.now() > (t.expires_at - 120000)) t = await refreshExpiring(shop, t); return (t && t.access_token) || null; } async function setToken(shop, token) { await db.set(k(shop), token); ensureScriptTag(shop).catch(function() {}); }
 async function delToken(shop) { try { await db.delete(k(shop)); } catch (e) {} }
 
 const validShop = (s) => /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(s || "");
@@ -43,6 +45,25 @@ async function gql(shop, token, query, variables) {
     body: JSON.stringify({ query, variables }),
   });
   return r.json();
+}
+
+// ---- Script Tag injection — ensures storefront.js is registered for every shop ----
+const _scriptTagDone = new Set();
+async function ensureScriptTag(shop) {
+  if (_scriptTagDone.has(shop)) return;
+  const token = await getToken(shop);
+  if (!token) return;
+  const src = HOST + "/storefront.js";
+  const existing = await gql(shop, token,
+    `{ scriptTags(first:10){ edges{ node{ id src } } } }`, {});
+  const tags = (existing.data && existing.data.scriptTags && existing.data.scriptTags.edges) || [];
+  const already = tags.some(function(e) { return e.node && e.node.src === src; });
+  if (!already) {
+    await gql(shop, token,
+      `mutation($i:ScriptTagInput!){ scriptTagCreate(input:$i){ scriptTag{ id } userErrors{ message } } }`,
+      { i: { src: src, displayScope: "ONLINE_STORE" } });
+  }
+  _scriptTagDone.add(shop);
 }
 
 // ---- Billing (gated by BILLING_ENABLED env flag) ----
@@ -212,6 +233,11 @@ app.get("/billing/callback", async (req, res) => {
   } catch (e) {
     res.status(500).send("Billing callback error: " + e.message);
   }
+});
+
+// ---------- Storefront script ----------
+app.get("/storefront.js", (req, res) => {
+  res.set("Content-Type", "application/javascript").set("Cache-Control", "public, max-age=300").status(200).send(STOREFRONT_JS);
 });
 
 // ---------- Storefront recommendations via Shopify App Proxy ----------

@@ -1,28 +1,29 @@
-# Boko AI Product Recommendations — app configuration
-# Replace client_id and application_url after creating the app in the Partner dashboard.
-# Run `shopify app config link` to sync, then `shopify app dev` / `shopify app deploy`.
-
-client_id = "REPLACE_WITH_YOUR_CLIENT_ID"
-name = "Boko AI Recommendations"
-application_url = "https://REPLACE_WITH_YOUR_HOST"
+client_id = "5db55cf89a2c12312b4bb6e469a5cb93"
+name = "AI Recommendations - By Boko"
+application_url = "https://boko-reco-public.replit.app"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,read_orders"
+scopes = "read_products,read_orders,write_script_tags"
 
 [auth]
-redirect_urls = [
-  "https://REPLACE_WITH_YOUR_HOST/api/auth/callback"
-]
-
-[app_proxy]
-# Storefront widget calls https://<shop>/apps/reco/recommend -> your backend /proxy
-url = "https://REPLACE_WITH_YOUR_HOST/proxy"
-subpath = "reco"
-prefix = "apps"
+redirect_urls = [ "https://boko-reco-public.replit.app/auth/callback" ]
 
 [webhooks]
 api_version = "2024-10"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://boko-reco-public.replit.app/webhooks/app_uninstalled"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://boko-reco-public.replit.app/webhooks/compliance"
+
+[app_proxy]
+url = "https://boko-reco-public.replit.app/proxy"
+subpath = "reco"
+prefix = "apps"
 
 [pos]
 embedded = false
