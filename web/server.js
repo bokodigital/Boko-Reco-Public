@@ -123,9 +123,7 @@ async function startSubscription(shop, token) {
   const userErrorMsg = (result && result.userErrors && result.userErrors.length)
     ? result.userErrors.map((e) => e.message).join("; ")
     : null;
-  const topErrorMsg = (j.errors && j.errors.length)
-    ? j.errors.map((e) => e.message).join("; ")
-    : null;
+  const topErrorMsg = Array.isArray(j.errors) ? j.errors.map((e) => e.message).join("; ") : (j.errors ? (typeof j.errors === "string" ? j.errors : JSON.stringify(j.errors)) : null);
   return {
     confirmationUrl: (result && result.confirmationUrl) || null,
     error: userErrorMsg || topErrorMsg || null,
