@@ -50,6 +50,68 @@ async function gql(shop, token, query, variables) {
   return r.json();
 }
 
+// ---- Billing (gated by BILLING_ENABLED env flag) ----
+const BILLING_ON = process.env.BILLING_ENABLED === "true";
+const PLAN_NAME = process.env.BILLING_PLAN_NAME || "AI Recommendations";
+const PLAN_PRICE = process.env.BILLING_PRICE || "99.00";
+const PLAN_CURRENCY = process.env.BILLING_CURRENCY || "USD";
+const TRIAL_DAYS = parseInt(process.env.BILLING_TRIAL_DAYS || "14", 10);
+const BILLING_TEST = process.env.BILLING_TEST !== "false";
+
+const bk = (shop) => "billed:" + shop;
+async function isBilled(shop) {
+  const r = await db.get(bk(shop));
+  if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value === true : false;
+  return r === true;
+}
+async function setBilled(shop, bool) { await db.set(bk(shop), bool); }
+
+async function activeSubscription(shop, token) {
+  const q = `{ currentAppInstallation { activeSubscriptions { id name status } } }`;
+  const j = await gql(shop, token, q, {});
+  const subs = (j.data && j.data.currentAppInstallation && j.data.currentAppInstallation.activeSubscriptions) || [];
+  return subs.find((s) => s.status === "ACTIVE") || null;
+}
+
+async function startSubscription(shop, token) {
+  const returnUrl = HOST + "/billing/callback?shop=" + encodeURIComponent(shop);
+  const mutation = `mutation($input: AppSubscriptionInput!) {
+    appSubscriptionCreate(name: $input.name, returnUrl: $input.returnUrl, test: $input.test, trialDays: $input.trialDays, lineItems: $input.lineItems) {
+      confirmationUrl
+      userErrors { message }
+    }
+  }`;
+  const cleanMutation = `mutation {
+    appSubscriptionCreate(
+      name: "${PLAN_NAME.replace(/"/g, '\\"')}"
+      returnUrl: "${returnUrl}"
+      test: ${BILLING_TEST}
+      trialDays: ${TRIAL_DAYS}
+      lineItems: [{
+        plan: {
+          appRecurringPricingDetails: {
+            price: { amount: "${PLAN_PRICE}", currencyCode: ${PLAN_CURRENCY} }
+            interval: EVERY_30_DAYS
+          }
+        }
+      }]
+    ) {
+      confirmationUrl
+      userErrors { message }
+    }
+  }`;
+  const j = await gql(shop, token, cleanMutation, {});
+  return (j.data && j.data.appSubscriptionCreate && j.data.appSubscriptionCreate.confirmationUrl) || null;
+}
+
+async function billingOK(shop, token) {
+  if (!BILLING_ON) return true;
+  if (await isBilled(shop)) return true;
+  const sub = await activeSubscription(shop, token);
+  if (sub) { await setBilled(shop, true); return true; }
+  return false;
+}
+
 const app = express();
 // Raw body only for webhooks (needed for HMAC); JSON for everything else.
 app.use("/webhooks", express.raw({ type: "*/*" }));
@@ -90,10 +152,44 @@ app.get("/auth/callback", async (req, res) => {
         `mutation($u:URL!){ webhookSubscriptionCreate(topic: APP_UNINSTALLED, webhookSubscription:{ callbackUrl:$u, format: JSON }){ userErrors{ message } } }`,
         { u: HOST + "/webhooks/app_uninstalled" });
     } catch (e) {}
+    // Billing gate: redirect to subscription confirmation if not yet billed
+    if (BILLING_ON && !(await billingOK(shop, tok.access_token))) {
+      const confirmationUrl = await startSubscription(shop, tok.access_token);
+      if (confirmationUrl) return res.redirect(confirmationUrl);
+    }
     // Open the embedded app in admin
     res.redirect(`https://${shop}/admin/apps/${API_KEY}`);
   } catch (e) {
     res.status(500).send("Auth error: " + e.message);
+  }
+});
+
+// ---------- Billing routes ----------
+app.get("/billing/start", async (req, res) => {
+  try {
+    const shop = req.query.shop;
+    if (!validShop(shop)) return res.status(400).send("Invalid shop");
+    const token = await getToken(shop);
+    if (!token) return res.redirect("/auth?shop=" + encodeURIComponent(shop));
+    const confirmationUrl = await startSubscription(shop, token);
+    if (!confirmationUrl) return res.status(500).send("Could not start subscription");
+    res.redirect(confirmationUrl);
+  } catch (e) {
+    res.status(500).send("Billing error: " + e.message);
+  }
+});
+
+app.get("/billing/callback", async (req, res) => {
+  try {
+    const shop = req.query.shop;
+    if (!validShop(shop)) return res.status(400).send("Invalid shop");
+    const token = await getToken(shop);
+    if (!token) return res.redirect("/auth?shop=" + encodeURIComponent(shop));
+    const sub = await activeSubscription(shop, token);
+    await setBilled(shop, !!sub);
+    res.redirect(`https://${shop}/admin/apps/${API_KEY}`);
+  } catch (e) {
+    res.status(500).send("Billing callback error: " + e.message);
   }
 });
 
@@ -130,6 +226,7 @@ app.get("/proxy/recommend", async (req, res) => {
     const shop = req.query.shop;
     const token = await getToken(shop);
     if (!token) return res.status(200).send(JSON.stringify({ items: [], error: "app not installed for shop" }));
+    if (!(await billingOK(shop, token))) return res.status(200).send(JSON.stringify({ items: [], error: "subscription required" }));
     const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
     const atype = (req.query.atype || "").trim();
     const anum = (req.query.anchor || "").trim();
@@ -223,6 +320,7 @@ app.get("/stats", async (req, res) => {
     let token = await getToken(shop);
     if (!token) token = await tokenExchange(shop, idToken);
     if (!token) return res.status(200).send(JSON.stringify({ error: "not installed", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
+    if (!(await billingOK(shop, token))) return res.status(200).send(JSON.stringify({ error: "subscription required", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
     const days = Math.min(parseInt(req.query.days || "90", 10), 365);
     res.status(200).send(JSON.stringify(await loadStats(shop, token, days)));
   } catch (e) {
@@ -279,7 +377,8 @@ function load(){
   var days=document.getElementById("days").value;
   authedFetch("/stats?days="+days).then(function(d){
     CUR=d.currency||"USD";
-    document.getElementById("err").innerHTML=d.error?"<div class='err'>"+(d.error==="unauthorized"?"Couldn't verify your session — open this from Shopify Admin → Apps.":"Couldn't read orders: "+d.error+". Ensure the app has read_orders scope.")+"</div>":"";
+    var shopParam=new URLSearchParams(window.location.search).get("shop")||"";
+    document.getElementById("err").innerHTML=d.error?"<div class='err'>"+(d.error==="unauthorized"?"Couldn't verify your session — open this from Shopify Admin → Apps.":d.error==="subscription required"?"An active subscription is required. <a href='/billing/start?shop="+encodeURIComponent(shopParam)+"' target='_top'>Subscribe now</a>.":"Couldn't read orders: "+d.error+". Ensure the app has read_orders scope.")+"</div>":"";
     document.getElementById("revTotal").textContent=fmt(d.totalRevenue);
     document.getElementById("itemTotal").textContent=(d.totalItems!=null?d.totalItems:0);
     document.getElementById("pdpTotal").textContent=(d.pdp&&d.pdp.total)||0;
@@ -303,15 +402,46 @@ app.get("/dashboard", (req, res) => {
   res.set("Content-Type", "text/html").status(200).send(DASHBOARD.replace("__APP_BRIDGE__", ab));
 });
 
-// ---------- Uninstall webhook (HMAC verified) — removes only this shop's token ----------
-app.post("/webhooks/app_uninstalled", (req, res) => {
+// ---------- Webhook HMAC verification ----------
+function verifyWebhook(req) {
   const hmac = req.get("X-Shopify-Hmac-Sha256") || "";
   const digest = crypto.createHmac("sha256", API_SECRET).update(req.body).digest("base64");
-  let ok = false;
-  try { ok = crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac)); } catch (e) {}
-  if (!ok) return res.status(401).send("bad hmac");
+  try { return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac)); } catch (e) { return false; }
+}
+
+// ---------- Uninstall webhook (HMAC verified) — removes only this shop's token ----------
+app.post("/webhooks/app_uninstalled", (req, res) => {
+  if (!verifyWebhook(req)) return res.status(401).send("bad hmac");
   const shop = req.get("X-Shopify-Shop-Domain");
-  if (validShop(shop)) delToken(shop);
+  if (validShop(shop)) { delToken(shop); setBilled(shop, false); }
+  res.status(200).send("ok");
+});
+
+// ---------- GDPR / compliance webhooks ----------
+app.post("/webhooks/customers/data_request", (req, res) => {
+  if (!verifyWebhook(req)) return res.status(401).send("bad hmac");
+  res.status(200).send("ok");
+});
+
+app.post("/webhooks/customers/redact", (req, res) => {
+  if (!verifyWebhook(req)) return res.status(401).send("bad hmac");
+  res.status(200).send("ok");
+});
+
+app.post("/webhooks/shop/redact", async (req, res) => {
+  if (!verifyWebhook(req)) return res.status(401).send("bad hmac");
+  const shop = req.get("X-Shopify-Shop-Domain");
+  if (validShop(shop)) { await delToken(shop); await setBilled(shop, false); }
+  res.status(200).send("ok");
+});
+
+app.post("/webhooks/compliance", async (req, res) => {
+  if (!verifyWebhook(req)) return res.status(401).send("bad hmac");
+  const topic = req.get("X-Shopify-Topic") || "";
+  if (topic === "shop/redact") {
+    const shop = req.get("X-Shopify-Shop-Domain");
+    if (validShop(shop)) { await delToken(shop); await setBilled(shop, false); }
+  }
   res.status(200).send("ok");
 });
 
