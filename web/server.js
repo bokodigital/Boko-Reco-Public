@@ -300,7 +300,7 @@ async function loadStats(shop, token, days) {
   const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
   const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity discountedTotalSet{ shopMoney{ amount currencyCode } } customAttributes{ key value } } } } } } } }`;
   const j = await gql(shop, token, query, { n: 100, q: "created_at:>=" + since });
-  if (j.errors) return { error: JSON.stringify(j.errors), pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } };
+  if (j.errors) { const __es = JSON.stringify(j.errors); const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0; return { error: __locked ? "orders_locked" : __es, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }; }
   const orders = (j.data && j.data.orders && j.data.orders.edges) || [];
   const src = { pdp: { items: {}, rev: 0 }, cart_drawer: { items: {}, rev: 0 } };
   let currency = "";
@@ -389,7 +389,7 @@ function load(){
   authedFetch("/stats?days="+days).then(function(d){
     CUR=d.currency||"USD";
     var shopParam=new URLSearchParams(window.location.search).get("shop")||"";
-    document.getElementById("err").innerHTML=d.error?"<div class='err'>"+(d.error==="unauthorized"?"Couldn't verify your session — open this from Shopify Admin → Apps.":d.error==="subscription required"?"An active subscription is required. <a href='/billing/start?shop="+encodeURIComponent(shopParam)+"' target='_top'>Subscribe now</a>.":"Couldn't read orders: "+d.error+". Ensure the app has read_orders scope.")+"</div>":"";
+    document.getElementById("err").innerHTML=(function(){if(!d.error)return"";if(d.error==="unauthorized")return "<div class='err'>Couldn't verify your session. Open this from Shopify Admin &rarr; Apps.</div>";if(d.error==="subscription required")return "<div class='err'>An active subscription is required. <a href='/billing/start?shop="+encodeURIComponent(shopParam)+"' target='_top'>Subscribe now</a>.</div>";if(d.error==="orders_locked")return "<div style='background:#eef4ff;border:1px solid #c9d8f5;color:#33415c;padding:10px 14px;border-radius:8px;font-size:13px'>Revenue from recommendations will appear once Shopify approves protected customer data access for this app. Your recommendation widgets are fully active.</div>";return "<div class='err'>Couldn't load stats: "+d.error+"</div>";})();
     document.getElementById("revTotal").textContent=fmt(d.totalRevenue);
     document.getElementById("itemTotal").textContent=(d.totalItems!=null?d.totalItems:0);
     document.getElementById("pdpTotal").textContent=(d.pdp&&d.pdp.total)||0;
