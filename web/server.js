@@ -298,6 +298,7 @@ async function tokenExchange(shop, idToken) {
         subject_token: idToken,
         subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
         requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token",
+          expiring: 1,
       }),
     }).then((x) => x.json());
     if (!r || !r.access_token) return null;
