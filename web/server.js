@@ -18,9 +18,13 @@
 
 import express from "express";
 import crypto from "crypto";
-import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const STOREFRONT_PATH = join(__dirname, "storefront.js");
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
@@ -29,7 +33,6 @@ const SCOPES = process.env.SCOPES || "read_products,read_orders,write_script_tag
 const HOST = (process.env.HOST || "").replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();
-const STOREFRONT_JS = readFileSync(new URL("./storefront.js", import.meta.url), "utf8");
 
 // ---- token store (per shop) — handles both @replit/database return styles ----
 const k = (shop) => "shop:" + shop;
@@ -237,7 +240,7 @@ app.get("/billing/callback", async (req, res) => {
 
 // ---------- Storefront script ----------
 app.get("/storefront.js", (req, res) => {
-  res.set("Content-Type", "application/javascript").set("Cache-Control", "public, max-age=300").status(200).send(STOREFRONT_JS);
+  res.set("Content-Type", "application/javascript").set("Cache-Control", "no-cache").sendFile(STOREFRONT_PATH);
 });
 
 // ---------- Storefront recommendations via Shopify App Proxy ----------
