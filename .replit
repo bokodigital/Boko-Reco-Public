@@ -17,6 +17,6 @@ externalPort = 80
 expertMode = true
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "autoscale"
 build = ["sh", "-c", "cd web && npm install"]
 run = ["sh", "-c", "cd web && node server.js"]
