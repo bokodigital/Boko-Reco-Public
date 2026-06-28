@@ -133,21 +133,77 @@
 </script>
 {%- endif -%}
 
+{% if block.settings.custom_css != blank %}<style>{{ block.settings.custom_css }}</style>{% endif %}
+
 {% schema %}
 {
   "name": "AI Cart Recommendations",
   "target": "body",
   "settings": [
-    { "type": "checkbox", "id": "enabled", "label": "Enable cart recommendations", "default": true },
-    { "type": "text", "id": "title", "label": "Heading", "default": "You may also like" },
-    { "type": "range", "id": "count", "label": "Products to cycle through", "min": 2, "max": 12, "step": 1, "default": 6 },
-    { "type": "range", "id": "autoplay", "label": "Auto-advance (seconds, 0 = off)", "min": 0, "max": 10, "step": 1, "default": 0 },
-    { "type": "range", "id": "heading_size", "label": "Heading size (px)", "min": 11, "max": 22, "step": 1, "default": 15 },
-    { "type": "range", "id": "body_size", "label": "Text size (px)", "min": 11, "max": 18, "step": 1, "default": 13 },
     {
-      "type": "text", "id": "proxy_url", "label": "App proxy path",
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable cart recommendations",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "You may also like"
+    },
+    {
+      "type": "range",
+      "id": "count",
+      "label": "Products to cycle through",
+      "min": 2,
+      "max": 12,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "type": "range",
+      "id": "autoplay",
+      "label": "Auto-advance (seconds, 0 = off)",
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size (px)",
+      "min": 11,
+      "max": 22,
+      "step": 1,
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "body_size",
+      "label": "Text size (px)",
+      "min": 11,
+      "max": 18,
+      "step": 1,
+      "default": 13
+    },
+    {
+      "type": "text",
+      "id": "proxy_url",
+      "label": "App proxy path",
       "default": "/apps/reco/recommend",
       "info": "Leave as-is unless you changed the App Proxy subpath."
+    },
+    {
+      "type": "header",
+      "content": "Advanced"
+    },
+    {
+      "type": "textarea",
+      "id": "custom_css",
+      "label": "Custom CSS",
+      "info": "Target: .boko-cc, .bcc-h, .bcc-slide, .bcc-img, .bcc-add"
     }
   ]
 }

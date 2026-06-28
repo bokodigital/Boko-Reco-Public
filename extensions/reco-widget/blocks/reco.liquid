@@ -127,27 +127,191 @@
   document.querySelectorAll("[data-boko-reco]").forEach(init);
 })();
 </script>
+{% if block.settings.custom_css != blank %}<style>{{ block.settings.custom_css }}</style>{% endif %}
+
 {% schema %}
 {
   "name": "AI Recommendations",
   "target": "section",
   "settings": [
-    { "type": "text", "id": "title", "label": "Heading", "default": "You may also like" },
-    { "type": "range", "id": "per_row", "label": "Products per row", "min": 2, "max": 6, "step": 1, "default": 4 },
-    { "type": "range", "id": "limit", "label": "Number of products", "min": 2, "max": 24, "step": 1, "default": 8 },
-    { "type": "range", "id": "bundle_discount", "label": "Bundle discount %", "min": 0, "max": 50, "step": 1, "default": 10 },
-    { "type": "text", "id": "proxy_url", "label": "App endpoint URL", "default": "/apps/reco/recommend", "info": "Leave as-is unless you changed the App Proxy subpath." },
-    { "type": "header", "content": "Design" },
-    { "type": "checkbox", "id": "use_theme_fonts", "label": "Use my theme's fonts", "default": true },
-    { "type": "select", "id": "font_family", "label": "Font family (if not using theme fonts)", "options": [ { "value": "jost", "label": "Jost (modern)" }, { "value": "poppins", "label": "Poppins" }, { "value": "helvetica", "label": "Helvetica / Arial" }, { "value": "georgia", "label": "Georgia (serif)" }, { "value": "system", "label": "System default" } ], "default": "jost" },
-    { "type": "range", "id": "heading_size", "label": "Heading size", "min": 16, "max": 48, "step": 1, "unit": "px", "default": 30 },
-    { "type": "range", "id": "heading_spacing", "label": "Heading letter-spacing", "min": 0, "max": 10, "step": 1, "unit": "px", "default": 7 },
-    { "type": "select", "id": "heading_weight", "label": "Heading weight", "options": [ { "value": "300", "label": "Light" }, { "value": "400", "label": "Regular" }, { "value": "600", "label": "Semibold" }, { "value": "800", "label": "Bold" } ], "default": "300" },
-    { "type": "range", "id": "body_size", "label": "Product text size", "min": 11, "max": 20, "step": 1, "unit": "px", "default": 13 },
-    { "type": "range", "id": "grid_gap", "label": "Grid gap", "min": 0, "max": 32, "step": 1, "unit": "px", "default": 4 },
-    { "type": "header", "content": "Layout" },
-    { "type": "checkbox", "id": "full_width", "label": "Full-width section (edge to edge)", "default": true },
-    { "type": "select", "id": "image_fit", "label": "Image fit", "options": [ { "value": "cover", "label": "Fill cell (uniform height)" }, { "value": "contain", "label": "Show full image (no cropping)" } ], "default": "cover" }
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Heading",
+      "default": "You may also like"
+    },
+    {
+      "type": "range",
+      "id": "per_row",
+      "label": "Products per row",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "limit",
+      "label": "Number of products",
+      "min": 2,
+      "max": 24,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "bundle_discount",
+      "label": "Bundle discount %",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "type": "text",
+      "id": "proxy_url",
+      "label": "App endpoint URL",
+      "default": "/apps/reco/recommend",
+      "info": "Leave as-is unless you changed the App Proxy subpath."
+    },
+    {
+      "type": "header",
+      "content": "Design"
+    },
+    {
+      "type": "checkbox",
+      "id": "use_theme_fonts",
+      "label": "Use my theme's fonts",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "font_family",
+      "label": "Font family (if not using theme fonts)",
+      "options": [
+        {
+          "value": "jost",
+          "label": "Jost (modern)"
+        },
+        {
+          "value": "poppins",
+          "label": "Poppins"
+        },
+        {
+          "value": "helvetica",
+          "label": "Helvetica / Arial"
+        },
+        {
+          "value": "georgia",
+          "label": "Georgia (serif)"
+        },
+        {
+          "value": "system",
+          "label": "System default"
+        }
+      ],
+      "default": "jost"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 16,
+      "max": 48,
+      "step": 1,
+      "unit": "px",
+      "default": 30
+    },
+    {
+      "type": "range",
+      "id": "heading_spacing",
+      "label": "Heading letter-spacing",
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "unit": "px",
+      "default": 7
+    },
+    {
+      "type": "select",
+      "id": "heading_weight",
+      "label": "Heading weight",
+      "options": [
+        {
+          "value": "300",
+          "label": "Light"
+        },
+        {
+          "value": "400",
+          "label": "Regular"
+        },
+        {
+          "value": "600",
+          "label": "Semibold"
+        },
+        {
+          "value": "800",
+          "label": "Bold"
+        }
+      ],
+      "default": "300"
+    },
+    {
+      "type": "range",
+      "id": "body_size",
+      "label": "Product text size",
+      "min": 11,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "range",
+      "id": "grid_gap",
+      "label": "Grid gap",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "checkbox",
+      "id": "full_width",
+      "label": "Full-width section (edge to edge)",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "image_fit",
+      "label": "Image fit",
+      "options": [
+        {
+          "value": "cover",
+          "label": "Fill cell (uniform height)"
+        },
+        {
+          "value": "contain",
+          "label": "Show full image (no cropping)"
+        }
+      ],
+      "default": "cover"
+    },
+    {
+      "type": "header",
+      "content": "Advanced"
+    },
+    {
+      "type": "textarea",
+      "id": "custom_css",
+      "label": "Custom CSS",
+      "info": "Target: .boko-reco, .boko-reco__title, .boko-reco__card, .boko-reco__price, .boko-reco__atc"
+    }
   ]
 }
 {% endschema %}
