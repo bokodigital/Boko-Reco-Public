@@ -376,8 +376,12 @@ table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}th,td{t
 th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600}td.n{text-align:right;font-weight:600}td.r{text-align:right;color:#1f7a45}
 .empty{color:var(--muted);font-size:13px;padding:14px 0}.err{background:#fdeceb;border:1px solid #f6cdc8;color:#7a1d13;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px}
 .foot{color:var(--muted);font-size:12px;margin-top:20px;text-align:center}
-.how-to{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px}
-.how-to__h{font-size:16px;font-weight:600;margin:0 0 14px;letter-spacing:-.2px}
+.how-to{background:#fff;border:1px solid var(--line);border-radius:14px;padding:0;margin-bottom:20px;overflow:hidden}
+.how-to summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:18px 24px;font-size:16px;font-weight:600;letter-spacing:-.2px;user-select:none}
+.how-to summary::-webkit-details-marker{display:none}
+.how-to summary .chev{display:inline-block;font-style:normal;font-size:13px;transition:transform .2s;color:var(--muted)}
+.how-to[open] summary .chev{transform:rotate(90deg)}
+.how-to__body{padding:0 24px 20px}
 .how-to__list{margin:0 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:1.6}
 .how-to__list li strong{font-weight:600}
 .how-to__code{font-family:ui-monospace,"SFMono-Regular",monospace;font-size:12px;background:#f5f5f5;padding:2px 5px;border-radius:4px;white-space:nowrap}
@@ -386,8 +390,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 </style></head><body><div class="wrap">
 <h1>Boko AI Recommendations — Performance</h1>
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
-<div class="how-to">
-<h2 class="how-to__h">How to use</h2>
+<details class="how-to">
+<summary>How to use <span class="chev">&#9658;</span></summary>
+<div class="how-to__body">
 <ol class="how-to__list">
   <li><strong>Product page recommendations:</strong> Online Store &gt; Themes &gt; Customize &gt; pick a Products template &gt; Add block &gt; choose <em>AI Recommendations</em> (under Apps) &gt; Save.</li>
   <li><strong>Cart drawer recommendations:</strong> In Customize, open App embeds (puzzle icon) &gt; turn ON <em>AI Cart Recommendations</em> &gt; Save. (It shows only when the cart has items.)</li>
@@ -396,6 +401,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 </ol>
 <p class="how-to__help">Need help? Contact <a href="mailto:admin@boko.com.au">admin@boko.com.au</a>.</p>
 </div>
+</details>
 <div class="row"><label class="sub" style="margin:0">Period</label>
 <select id="days"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option></select>
 <span id="meta" class="sub" style="margin:0 0 0 auto"></span></div>
