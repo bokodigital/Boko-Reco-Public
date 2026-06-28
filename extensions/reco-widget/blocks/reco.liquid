@@ -8,10 +8,14 @@
 {%- liquid
   assign font_css = "TAN-MONCHERI"
   case block.settings.font_family
-    when 'poppins'   ; assign font_css = "'Poppins',sans-serif"
-    when 'helvetica' ; assign font_css = "Helvetica,Arial,sans-serif"
-    when 'georgia'   ; assign font_css = "Georgia,'Times New Roman',serif"
-    when 'system'    ; assign font_css = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
+    when 'poppins'
+      assign font_css = "'Poppins',sans-serif"
+    when 'helvetica'
+      assign font_css = "Helvetica,Arial,sans-serif"
+    when 'georgia'
+      assign font_css = "Georgia,'Times New Roman',serif"
+    when 'system'
+      assign font_css = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif"
   endcase
   if block.settings.use_theme_fonts
     assign font_css = "inherit"
