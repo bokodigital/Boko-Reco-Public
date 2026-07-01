@@ -244,11 +244,17 @@ function verifyProxy(query) {
 async function loadProducts(shop, token, limit = 100, productType = "") {
   const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
   const qstr = safe ? `status:active product_type:${safe}` : "status:active";
-  const query = `query($n:Int!){ products(first:$n, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt featuredImage{url} options{ name values } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
+  const query = `query($n:Int!){ products(first:$n, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
-  return edges.map((e, i) => {
-    const n = e.node;
+  const results = [];
+  for (let i = 0; i < edges.length; i++) {
+    const n = edges[i].node;
+    const giftType = /gift/i.test(n.productType || "");
+    const giftTag = (n.tags || []).some((t) => /gift/i.test(t));
+    const collHandles = (n.collections && n.collections.edges || []).map((ce) => ce.node.handle || "");
+    const giftColl = collHandles.some((h) => /gift/i.test(h));
+    if (n.isGiftCard || giftType || giftTag || giftColl) continue;
     const rawOpts = (n.options || []).filter((o) => !(o.name === "Title" && o.values && o.values.length === 1 && o.values[0] === "Default Title"));
     const options = rawOpts.map((o) => ({ name: o.name, values: o.values || [] }));
     const variants = (n.variants && n.variants.edges || []).map((ve) => {
@@ -263,12 +269,14 @@ async function loadProducts(shop, token, limit = 100, productType = "") {
       };
     });
     const v = n.variants && n.variants.edges[0] && n.variants.edges[0].node;
-    return { id: n.id, handle: n.handle, variantId: v && v.id, available: !!(v && v.availableForSale),
+    if (!v || !v.availableForSale) continue;
+    results.push({ id: n.id, handle: n.handle, variantId: v.id, available: true,
       title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
-      price: v ? parseFloat(v.price) : 0, img: (n.featuredImage && n.featuredImage.url) || "",
+      price: parseFloat(v.price), img: (n.featuredImage && n.featuredImage.url) || "",
       orders: Math.max(0, limit - i) * 3, views: 0, options, variants,
-      createdAt: n.publishedAt || n.createdAt || null };
-  }).filter((p) => p.variantId && p.available);
+      createdAt: n.publishedAt || n.createdAt || null });
+  }
+  return results;
 }
 
 app.get("/proxy/recommend", async (req, res) => {
