@@ -24,6 +24,3 @@ api_version = "2024-10"
 url = "https://boko-reco-public.replit.app/proxy"
 subpath = "reco"
 prefix = "apps"
-
-[pos]
-embedded = false
