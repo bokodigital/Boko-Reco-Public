@@ -337,18 +337,21 @@ async function tokenExchange(shop, idToken) {
 
 async function loadStats(shop, token, days) {
   const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
-  const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity discountedTotalSet{ shopMoney{ amount currencyCode } } customAttributes{ key value } } } } } } } }`;
+  const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity originalTotalSet{ shopMoney{ amount currencyCode } } discountAllocations{ allocatedAmountSet{ shopMoney{ amount } } } customAttributes{ key value } } } } } } } }`;
   const j = await gql(shop, token, query, { n: 100, q: "created_at:>=" + since });
-  if (j.errors) { const __es = JSON.stringify(j.errors); const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0; return { error: __locked ? "orders_locked" : __es, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }; }
+  if (j.errors) { const __es = JSON.stringify(j.errors); const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0; return { error: __locked ? "orders_locked" : __es, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }; }
   const orders = (j.data && j.data.orders && j.data.orders.edges) || [];
-  const src = { pdp: { items: {}, rev: 0 }, cart_drawer: { items: {}, rev: 0 } };
+  const src = { pdp: { items: {}, rev: 0 }, cart_drawer: { items: {}, rev: 0 }, sfy_page: { items: {}, rev: 0 } };
   let currency = "";
   orders.forEach((o) => (o.node.lineItems.edges || []).forEach((le) => {
-    const li = le.node; let tag = null;
-    (li.customAttributes || []).forEach((a) => { if (a.key === "_boko_reco") tag = a.value; });
+    const li = le.node; let bokoReco = null, bokoSource = null;
+    (li.customAttributes || []).forEach((a) => { if (a.key === "_boko_reco") bokoReco = a.value; if (a.key === "_boko_source") bokoSource = a.value; });
+    const tag = bokoReco || (bokoSource === "selected-for-you-page" ? "sfy_page" : null);
     if (tag && src[tag]) {
-      const m = li.discountedTotalSet && li.discountedTotalSet.shopMoney, amt = m ? parseFloat(m.amount) : 0;
-      if (m && m.currencyCode) currency = m.currencyCode;
+      const gross = li.originalTotalSet && li.originalTotalSet.shopMoney ? parseFloat(li.originalTotalSet.shopMoney.amount) : 0;
+      if (li.originalTotalSet && li.originalTotalSet.shopMoney && li.originalTotalSet.shopMoney.currencyCode) currency = li.originalTotalSet.shopMoney.currencyCode;
+      const disc = (li.discountAllocations || []).reduce((s, d) => s + (d.allocatedAmountSet && d.allocatedAmountSet.shopMoney ? parseFloat(d.allocatedAmountSet.shopMoney.amount) : 0), 0);
+      const amt = Math.max(0, gross - disc);
       const it = src[tag].items[li.title] || { count: 0, rev: 0 };
       it.count += li.quantity; it.rev += amt; src[tag].items[li.title] = it; src[tag].rev += amt;
     }
@@ -357,8 +360,8 @@ async function loadStats(shop, token, days) {
     const items = Object.keys(s.items).map((key) => ({ title: key, count: s.items[key].count, revenue: Math.round(s.items[key].rev * 100) / 100 })).sort((a, b) => b.count - a.count);
     return { total: items.reduce((x, i) => x + i.count, 0), revenue: Math.round(s.rev * 100) / 100, items };
   };
-  const pdp = pack(src.pdp), cd = pack(src.cart_drawer);
-  return { ordersScanned: orders.length, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue) * 100) / 100, totalItems: pdp.total + cd.total, pdp, cart_drawer: cd };
+  const pdp = pack(src.pdp), cd = pack(src.cart_drawer), sfy = pack(src.sfy_page);
+  return { ordersScanned: orders.length, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
 }
 
 app.get("/stats", async (req, res) => {
@@ -369,12 +372,12 @@ app.get("/stats", async (req, res) => {
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
     let token = await getToken(shop);
     if (!token) token = await tokenExchange(shop, idToken);
-    if (!token) return res.status(200).send(JSON.stringify({ error: "not installed", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
-    if (!(await billingOK(shop, token))) return res.status(200).send(JSON.stringify({ error: "subscription required", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
+    if (!token) return res.status(200).send(JSON.stringify({ error: "not installed", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
+    if (!(await billingOK(shop, token))) return res.status(200).send(JSON.stringify({ error: "subscription required", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
     const days = Math.min(parseInt(req.query.days || "90", 10), 365);
     res.status(200).send(JSON.stringify(await loadStats(shop, token, days)));
   } catch (e) {
-    res.status(200).send(JSON.stringify({ error: e.message, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] } }));
+    res.status(200).send(JSON.stringify({ error: e.message, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
   }
 });
 
@@ -391,7 +394,7 @@ h1{font-size:24px;font-weight:600;margin:0 0 4px}.sub{color:var(--muted);font-si
 select{font:inherit;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
 .hero{background:#0a0a0a;color:#fff;border-radius:14px;padding:22px 24px;margin-bottom:16px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
 .hero .v{font-size:40px;font-weight:700;letter-spacing:-1px}.hero .lime{color:var(--lime)}.hero .x{color:#bdbdbd;font-size:14px}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:720px){.cards{grid-template-columns:1fr}}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}@media(max-width:960px){.cards{grid-template-columns:1fr 1fr}}@media(max-width:600px){.cards{grid-template-columns:1fr}}
 .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 2px 16px rgba(0,0,0,.05)}
 .big{font-size:34px;font-weight:700;letter-spacing:-1px;margin:0}.rev{font-size:15px;color:#1f7a45;font-weight:600;margin:2px 0 0}
 .pill{display:inline-block;background:var(--lime);color:#0a0a0a;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:99px;margin-bottom:14px}
@@ -436,6 +439,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="pdpRows"></tbody></table></div>
   <div class="card"><span class="pill">Cart drawer carousel</span><div class="big" id="cdTotal">–</div><div class="rev" id="cdRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
+  <div class="card"><span class="pill">Selected For You collection</span><div class="big" id="sfyTotal">–</div><div class="rev" id="sfyRev"></div>
+    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="sfyRows"></tbody></table></div>
 </div><p class="foot" id="foot"></p></div>
 <script>
 var CUR="";
@@ -456,10 +461,13 @@ function load(){
     document.getElementById("itemTotal").textContent=(d.totalItems!=null?d.totalItems:0);
     document.getElementById("pdpTotal").textContent=(d.pdp&&d.pdp.total)||0;
     document.getElementById("cdTotal").textContent=(d.cart_drawer&&d.cart_drawer.total)||0;
+    document.getElementById("sfyTotal").textContent=(d.sfy_page&&d.sfy_page.total)||0;
     document.getElementById("pdpRev").textContent="Revenue: "+fmt(d.pdp&&d.pdp.revenue);
     document.getElementById("cdRev").textContent="Revenue: "+fmt(d.cart_drawer&&d.cart_drawer.revenue);
+    document.getElementById("sfyRev").textContent="Revenue: "+fmt(d.sfy_page&&d.sfy_page.revenue);
     rows(document.getElementById("pdpRows"),d.pdp&&d.pdp.items);
     rows(document.getElementById("cdRows"),d.cart_drawer&&d.cart_drawer.items);
+    rows(document.getElementById("sfyRows"),d.sfy_page&&d.sfy_page.items);
     document.getElementById("meta").textContent=d.ordersScanned!=null?(d.ordersScanned+" recent orders scanned"):"";
     document.getElementById("foot").textContent="Counts reflect orders since "+(d.since||"")+" whose items were added via a Boko recommendation widget.";
   }).catch(function(){document.getElementById("err").innerHTML="<div class='err'>Couldn't load stats.</div>";});
