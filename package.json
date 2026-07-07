@@ -3,5 +3,7 @@
   "version": "1.0.0",
   "license": "UNLICENSED",
   "scripts": {},
-  "dependencies": {}
+  "dependencies": {
+    "@shopify/shopify_function": "~2.0.0"
+  }
 }

@@ -1,0 +1,12 @@
+query RunInput {
+  cart {
+    lines {
+      id
+      quantity
+      bundle: attribute(key: "_boko_bundle") { value }
+    }
+  }
+  discountNode {
+    metafield(namespace: "$app:boko-bundle-disc", key: "function-configuration") { value }
+  }
+}

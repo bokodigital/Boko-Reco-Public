@@ -4,7 +4,7 @@ application_url = "https://boko-reco-public.replit.app"
 embedded = true
 
 [access_scopes]
-scopes = "read_products,read_orders,write_script_tags"
+scopes = "read_products,read_orders,write_script_tags,write_discounts"
 
 [auth]
 redirect_urls = [ "https://boko-reco-public.replit.app/auth/callback" ]
