@@ -20,6 +20,8 @@ import express from "express";
 import crypto from "crypto";
 import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
+import { track, funnelCounts } from "./boko-tracker.js";
+import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
@@ -244,15 +246,19 @@ function verifyProxy(query) {
 async function loadProducts(shop, token, limit = 100, productType = "") {
   const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
   const qstr = safe ? `status:active product_type:${safe}` : "status:active";
-  const query = `query($n:Int!){ products(first:$n, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
+  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
   const results = [];
+  const collectionsIndex = {};
   for (let i = 0; i < edges.length; i++) {
     const n = edges[i].node;
     const giftType = /gift/i.test(n.productType || "");
     const giftTag = (n.tags || []).some((t) => /gift/i.test(t));
-    const collHandles = (n.collections && n.collections.edges || []).map((ce) => ce.node.handle || "");
+    const collEdges = (n.collections && n.collections.edges) || [];
+    const collHandles = collEdges.map((ce) => ce.node.handle || "");
+    const collGids = collEdges.map((ce) => ce.node.id).filter(Boolean);
+    collEdges.forEach((ce) => { if (ce.node.handle && ce.node.id) collectionsIndex[ce.node.handle] = ce.node.id; });
     const giftColl = collHandles.some((h) => /gift/i.test(h));
     if (n.isGiftCard || giftType || giftTag || giftColl) continue;
     const rawOpts = (n.options || []).filter((o) => !(o.name === "Title" && o.values && o.values.length === 1 && o.values[0] === "Default Title"));
@@ -274,8 +280,10 @@ async function loadProducts(shop, token, limit = 100, productType = "") {
       title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
       price: parseFloat(v.price), img: (n.featuredImage && n.featuredImage.url) || "",
       orders: Math.max(0, limit - i) * 3, views: 0, options, variants,
+      collectionGids: collGids,
       createdAt: n.publishedAt || n.createdAt || null });
   }
+  results.collectionsIndex = collectionsIndex;
   return results;
 }
 
@@ -291,6 +299,11 @@ app.get("/proxy/recommend", async (req, res) => {
     const atype = (req.query.atype || "").trim();
     const anum = (req.query.anchor || "").trim();
     let products = await loadProducts(shop, token, 250);
+    const settings = await loadSettings();
+    const excludeHandles = String(req.query.exclude || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const excludeGids = handlesToCollectionGids(excludeHandles, products.collectionsIndex || {});
+    const exIds = new Set([...(settings.global.excludedCollections || []), ...excludeGids]);
+    if (exIds.size) products = products.filter((p) => !(p.collectionGids || []).some((id) => exIds.has(id)));
     const found = anum ? products.find((p) => p.id.endsWith(anum)) : null;
     const anchor = found || ((atype || req.query.atitle) ? {
       id: "anchor:" + anum,
@@ -305,6 +318,28 @@ app.get("/proxy/recommend", async (req, res) => {
   } catch (e) {
     res.status(200).send(JSON.stringify({ items: [], error: e.message }));
   }
+});
+
+// ---------- Public storefront config (theme extensions read component styling) ----------
+app.get("/proxy/config", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    if (!verifyProxy(req.query)) return res.status(401).send(JSON.stringify({ error: "bad signature" }));
+    const settings = await loadSettings();
+    res.status(200).send(JSON.stringify(publicConfig(settings)));
+  } catch (e) {
+    res.status(200).send(JSON.stringify(publicConfig(await loadSettings().catch(() => null))));
+  }
+});
+
+// ---------- Public funnel event tracking (impression / click / add_to_cart) ----------
+app.post("/proxy/track", express.json({ type: () => true }), async (req, res) => {
+  try {
+    if (!verifyProxy(req.query)) return res.status(401).end();
+    const b = req.body || {};
+    await track(b.event, b.source);
+  } catch (e) {}
+  res.status(204).end();
 });
 
 // ---------- Embedded dashboard data (session-token authenticated) ----------
@@ -381,6 +416,57 @@ app.get("/stats", async (req, res) => {
   }
 });
 
+app.get("/funnel", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
+    const shop = shopFromSessionToken(idToken);
+    if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
+    const days = Math.min(parseInt(req.query.days || "30", 10), 365);
+    res.status(200).send(JSON.stringify(await funnelCounts(days)));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ error: e.message }));
+  }
+});
+
+async function loadCollectionsList(shop, token) {
+  const query = `query{ collections(first:100){ edges{ node{ id handle title } } } }`;
+  const j = await gql(shop, token, query, {});
+  const edges = (j.data && j.data.collections && j.data.collections.edges) || [];
+  return edges.map((e) => ({ id: e.node.id, handle: e.node.handle, title: e.node.title }));
+}
+
+app.get("/settings", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
+    const shop = shopFromSessionToken(idToken);
+    if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
+    let token = await getToken(shop);
+    if (!token) token = await tokenExchange(shop, idToken);
+    const [settings, collections] = await Promise.all([
+      loadSettings(),
+      token ? loadCollectionsList(shop, token).catch(() => []) : Promise.resolve([]),
+    ]);
+    res.status(200).send(JSON.stringify({ settings, collections }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ error: e.message }));
+  }
+});
+
+app.post("/settings", express.json(), async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
+    const shop = shopFromSessionToken(idToken);
+    if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
+    const merged = await saveSettings(req.body || {});
+    res.status(200).send(JSON.stringify({ settings: merged }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ error: e.message }));
+  }
+});
+
 const DASHBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 __APP_BRIDGE__
 <title>Boko Recommendations — Dashboard</title>
@@ -413,8 +499,32 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 .how-to__code{font-family:ui-monospace,"SFMono-Regular",monospace;font-size:12px;background:#f5f5f5;padding:2px 5px;border-radius:4px;white-space:nowrap}
 .how-to__help{font-size:13px;color:var(--muted);margin:0}
 .how-to__help a{color:var(--ink);font-weight:500}
+.tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.tab-btn{font:inherit;font-weight:600;font-size:14px;background:none;border:none;padding:10px 4px;margin-right:18px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.tab-btn.active{color:var(--ink);border-bottom-color:var(--ink)}
+.cz-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}@media(max-width:960px){.cz-grid{grid-template-columns:1fr}}
+.cz-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px}
+.cz-card h3{margin:0 0 14px;font-size:15px;font-weight:600}
+.cz-field{margin-bottom:10px}
+.cz-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.cz-field input[type=text],.cz-field input[type=number]{width:100%;font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.cz-field input[type=color]{width:48px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:#fff}
+.cz-row2{display:flex;gap:10px}.cz-row2>div{flex:1}
+.cz-global{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:20px}
+.cz-global h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.cz-multiselect{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.cz-chip{display:flex;align-items:center;gap:6px;font-size:13px;border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer;user-select:none}
+.cz-chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.cz-save{display:flex;align-items:center;gap:12px}
+.cz-save button{font:inherit;font-weight:600;background:var(--ink);color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer}
+.cz-status{font-size:13px;color:var(--muted)}
 </style></head><body><div class="wrap">
-<h1>Boko AI Recommendations — Performance</h1>
+<h1>Boko AI Recommendations</h1>
+<div class="tabs">
+  <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
+  <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
+</div>
+<div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
 <details class="how-to">
 <summary>How to use <span class="chev">&#9658;</span></summary>
@@ -422,8 +532,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 <ol class="how-to__list">
   <li><strong>Product page recommendations:</strong> Online Store &gt; Themes &gt; Customize &gt; pick a Products template &gt; Add block &gt; choose <em>AI Recommendations</em> (under Apps) &gt; Save.</li>
   <li><strong>Cart drawer recommendations:</strong> In Customize, open App embeds (puzzle icon) &gt; turn ON <em>AI Cart Recommendations</em> &gt; Save. (It shows only when the cart has items.)</li>
-  <li><strong>Customise:</strong> Click the block or embed to set heading, products per row, number of products, bundle discount, fonts and layout.</li>
-  <li><strong>Custom CSS:</strong> Open the &#8216;Custom CSS&#8217; box in the block/embed settings and paste CSS. Target these classes &#8212; Product rail: <span class="how-to__code">.boko-reco</span> <span class="how-to__code">.boko-reco__title</span> <span class="how-to__code">.boko-reco__card</span> <span class="how-to__code">.boko-reco__price</span> <span class="how-to__code">.boko-reco__atc</span> &nbsp;&middot;&nbsp; Cart carousel: <span class="how-to__code">.boko-cc</span> <span class="how-to__code">.bcc-h</span> <span class="how-to__code">.bcc-slide</span> <span class="how-to__code">.bcc-img</span> <span class="how-to__code">.bcc-add</span>. Add <span class="how-to__code">!important</span> to override theme styles.</li>
+  <li><strong>Customise:</strong> Use the Customizer tab above, or click the block/embed in the theme editor, to set heading, products per row, number of products, bundle discount, fonts and layout.</li>
 </ol>
 <p class="how-to__help">Need help? Contact <a href="mailto:admin@boko.com.au">admin@boko.com.au</a>.</p>
 </div>
@@ -441,7 +550,19 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
   <div class="card"><span class="pill">Selected For You collection</span><div class="big" id="sfyTotal">–</div><div class="rev" id="sfyRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="sfyRows"></tbody></table></div>
-</div><p class="foot" id="foot"></p></div>
+</div><p class="foot" id="foot"></p>
+</div>
+<div id="tab-customizer" style="display:none">
+<p class="sub">Style each recommendation widget and choose which collections to always exclude.</p>
+<div id="czErr"></div>
+<div class="cz-grid" id="czGrid"></div>
+<div class="cz-global">
+  <h3>Excluded collections</h3>
+  <p class="sub" style="margin:0">Products in these collections never appear in any recommendation widget.</p>
+  <div class="cz-multiselect" id="czCollections"></div>
+</div>
+<div class="cz-save"><button id="czSaveBtn" type="button">Save changes</button><span class="cz-status" id="czStatus"></span></div>
+</div>
 <script>
 var CUR="";
 function fmt(n){try{return new Intl.NumberFormat(undefined,{style:"currency",currency:CUR||"USD"}).format(n||0);}catch(e){return "$"+(Number(n||0)).toFixed(2);}}
@@ -473,6 +594,97 @@ function load(){
   }).catch(function(){document.getElementById("err").innerHTML="<div class='err'>Couldn't load stats.</div>";});
 }
 document.getElementById("days").addEventListener("change",load); load();
+
+var CZ_COMPONENTS=[["rail","Product page rail"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
+var czState=null, czCollections=[], czLoaded=false;
+function czField(comp,key,label,type,extra){
+  extra=extra||"";
+  return "<div class='cz-field'><label>"+label+"</label><input "+extra+" type='"+type+"' data-comp='"+comp+"' data-key='"+key+"' id='cz-"+comp+"-"+key+"'></div>";
+}
+function renderCzGrid(){
+  var html="";
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0], label=pair[1];
+    html+="<div class='cz-card'><h3>"+label+"</h3>"+
+      czField(comp,"headingFont","Heading font","text")+
+      czField(comp,"bodyFont","Body font","text")+
+      "<div class='cz-row2'>"+czField(comp,"headingSize","Heading size (px)","number")+czField(comp,"count","Number of products","number")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"titleSize","Title size (px)","number")+czField(comp,"columns","Columns","number")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"priceSize","Price size (px)","number")+"<div></div></div>"+
+      "<div class='cz-row2'>"+czField(comp,"headingColor","Heading color","color")+czField(comp,"titleColor","Title color","color")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"priceColor","Price color","color")+czField(comp,"saleColor","Sale color","color")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"addBg","Add-to-cart background","color")+czField(comp,"addText","Add-to-cart text","color")+"</div>"+
+      "</div>";
+  });
+  document.getElementById("czGrid").innerHTML=html;
+}
+function fillCzForm(settings){
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0]; var s=(settings&&settings[comp])||{};
+    Object.keys(s).forEach(function(key){
+      var el=document.getElementById("cz-"+comp+"-"+key);
+      if(el) el.value=s[key];
+    });
+  });
+}
+function renderCzCollections(collections,excluded){
+  var ex=new Set(excluded||[]);
+  document.getElementById("czCollections").innerHTML=(collections&&collections.length)?collections.map(function(c){
+    return "<span class='cz-chip"+(ex.has(c.id)?" on":"")+"' data-gid='"+c.id+"'>"+c.title+"</span>";
+  }).join(""):"<span class='sub' style='margin:0'>No collections found.</span>";
+  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip"),function(chip){
+    chip.addEventListener("click",function(){ chip.classList.toggle("on"); });
+  });
+}
+function collectCzForm(){
+  var out={global:{excludedCollections:[]}};
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0]; out[comp]={};
+    Array.prototype.forEach.call(document.querySelectorAll("[data-comp='"+comp+"']"),function(el){
+      var key=el.getAttribute("data-key");
+      var v=el.type==="number"?parseFloat(el.value)||0:el.value;
+      out[comp][key]=v;
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){
+    out.global.excludedCollections.push(chip.getAttribute("data-gid"));
+  });
+  return out;
+}
+function loadCustomizer(){
+  if(czLoaded) return;
+  renderCzGrid();
+  authedFetch("/settings").then(function(d){
+    if(d.error){ document.getElementById("czErr").innerHTML="<div class='err'>Couldn't load settings: "+d.error+"</div>"; return; }
+    czState=d.settings; czCollections=d.collections||[];
+    fillCzForm(czState);
+    renderCzCollections(czCollections,czState.global&&czState.global.excludedCollections);
+    czLoaded=true;
+  }).catch(function(){ document.getElementById("czErr").innerHTML="<div class='err'>Couldn't load settings.</div>"; });
+}
+document.getElementById("czSaveBtn").addEventListener("click",function(){
+  var status=document.getElementById("czStatus");
+  status.textContent="Saving…";
+  var body=collectCzForm();
+  var headers={Accept:"application/json","Content-Type":"application/json"};
+  (async function(){
+    try{ if(window.shopify&&shopify.idToken){ var t=await shopify.idToken(); headers.Authorization="Bearer "+t; } }catch(e){}
+    fetch("/settings",{method:"POST",headers:headers,body:JSON.stringify(body)}).then(function(r){return r.json();}).then(function(d){
+      if(d.error){ status.textContent="Error: "+d.error; return; }
+      czState=d.settings; status.textContent="Saved.";
+      setTimeout(function(){ status.textContent=""; },2500);
+    }).catch(function(){ status.textContent="Couldn't save changes."; });
+  })();
+});
+function showTab(name){
+  document.getElementById("tab-performance").style.display=(name==="perf")?"":"none";
+  document.getElementById("tab-customizer").style.display=(name==="cz")?"":"none";
+  document.getElementById("tabBtnPerf").classList.toggle("active",name==="perf");
+  document.getElementById("tabBtnCz").classList.toggle("active",name==="cz");
+  if(name==="cz") loadCustomizer();
+}
+document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
+document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
 </script></body></html>`;
 
 app.get("/dashboard", (req, res) => {

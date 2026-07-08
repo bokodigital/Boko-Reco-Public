@@ -134,7 +134,22 @@ async function refineWithLLM({ candidates, anchor }) {
 }
 
 async function recommend({ products, anchor = null, limit = 8, useLLM = true }) {
-  const ranked = rankHeuristic("recommended", products, anchor);
+  // Prefer products published in the last 90 days; if that pool is too small to
+  // fill the grid, extend with the next-newest products (products[] arrives
+  // newest-first from loadProducts, so this preserves recency order).
+  const RECENT_DAYS = 90;
+  const now = Date.now();
+  const ageDays = (p) => (p.createdAt ? (now - new Date(p.createdAt).getTime()) / 86400000 : Infinity);
+  const needed = Math.max(limit, 12);
+  const recentPool = products.filter((p) => ageDays(p) <= RECENT_DAYS);
+  let workingSet = products;
+  if (recentPool.length >= needed) {
+    workingSet = recentPool;
+  } else if (recentPool.length > 0) {
+    const recentIds = new Set(recentPool.map((p) => p.id));
+    workingSet = recentPool.concat(products.filter((p) => !recentIds.has(p.id)));
+  }
+  const ranked = rankHeuristic("recommended", workingSet, anchor);
   const anchorCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : "";
   const bycat = new Map();
   for (const p of ranked) {

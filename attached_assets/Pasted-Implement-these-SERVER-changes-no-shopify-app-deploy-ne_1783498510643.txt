@@ -1,0 +1,17 @@
+Implement these SERVER changes (no shopify app deploy needed — Replit Republish only). This ports the improved Boko-Reco-App engine and adds merchant-customizer features. One-time first: npm install @replit/database.
+
+1) RECOMMENDATION ENGINE: in loadProducts fetch newest-first — products(first: 250, sortKey: PUBLISHED_AT, reverse: true) — and select publishedAt, tags, handle, featuredImage, and first variant id+price. Keep gift-product exclusion, active/in-stock filtering, returning handle, the "prefer recent (last 90 days) but fill the grid with next-newest" logic, and the complement/round-robin-across-categories ranking (+ optional LLM styling pass).
+
+2) NEW FILE web/boko-tracker.js — persistent funnel counters backed by Replit DB (@replit/database). Exports track(event, source) and funnelCounts(days). On boot load key "boko_track" from the DB, and if empty but boko-track.json exists import it. normSource maps a source string to sfy / cart_drawer / pdp. Save debounced (every few seconds) and on SIGTERM/SIGINT.
+
+3) NEW FILE web/boko-settings.js — merchant customizer settings + collection exclusion, backed by Replit DB key "boko_settings". Shape: { global:{excludedCollections:[collection GIDs]}, rail:{...}, cart:{...}, sfy:{...} }, where each component has headingFont, bodyFont, headingSize, titleSize, priceSize, headingColor, titleColor, priceColor, saleColor, addBg, addText, count, columns — all with sensible defaults. Exports: loadSettings(), saveSettings(next), publicConfig(s) (the widget-facing subset), excludedProductIds(gql, extraGids) which builds a Set of product ids belonging to the excluded collections (paginate collection.products, cache ~10 min), and handlesToCollectionGids(gql, handles).
+
+4) ROUTES:
+ - In /proxy/recommend, after loadProducts and before ranking: read ?exclude=handle1,handle2, convert with handlesToCollectionGids, union with the stored excludedCollections, then products = products.filter(p => !exIds.has(p.id)).
+ - GET /proxy/config  -> publicConfig(await loadSettings())  (public, via app proxy).
+ - GET /settings (admin/session) -> loadSettings; POST /settings -> saveSettings(req.body).
+ - POST /proxy/track (express.json {type:()=>true}) -> track(b.event, b.source); respond 204. Keep /funnel using funnelCounts(days).
+
+5) DASHBOARD: make it dynamic and add a CUSTOMIZER page — for each component (Product Rail, Cart Drawer, Selected For You) controls for font family, heading/title/price sizes, colours, count/columns; plus a global "Exclude collections" multiselect populated from the store's collections; Save posts to /settings. REMOVE any custom-code / custom-CSS field from the dashboard and from the app entirely.
+
+Then republish to production. (The theme-extension block settings are a separate step that needs shopify app deploy — do NOT attempt that now; server only.)

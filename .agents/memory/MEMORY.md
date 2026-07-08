@@ -1,0 +1,1 @@
+- [Boko Reco app conventions](boko-reco-conventions.md) — Replit DB storage keys, collection-exclusion filtering approach, and workflow/port setup for this Shopify app.

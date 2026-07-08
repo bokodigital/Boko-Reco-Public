@@ -11,7 +11,7 @@ LLM_MODEL = "gpt-4o-mini"
 
 [[ports]]
 localPort = 3000
-externalPort = 80
+externalPort = 3000
 
 [agent]
 expertMode = true
@@ -20,3 +20,27 @@ expertMode = true
 deploymentTarget = "autoscale"
 build = ["sh", "-c", "cd web && npm install"]
 run = ["sh", "-c", "cd web && node server.js"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd web && npm install && npm start"
+waitForPort = 3000
+
+[workflows.workflow.metadata]
+outputType = "console"
