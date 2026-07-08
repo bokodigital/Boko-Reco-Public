@@ -672,7 +672,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div class="tabs">
   <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
   <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
-  <button class="tab-btn" id="tabBtnSf" type="button">Storefront setup</button>
+  <button class="tab-btn" id="tabBtnSf" type="button" style="display:none">Storefront setup</button>
 </div>
 <div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
