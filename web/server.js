@@ -22,11 +22,13 @@ import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
+import { SFY_SECTION_LIQUID, SFY_PAGE_TEMPLATE } from "./theme-assets.js";
+import { STOREFRONT_JS } from "./storefront-script.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
 const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
-const SCOPES = process.env.SCOPES || "read_products,read_orders,write_script_tags";
+const SCOPES = process.env.SCOPES || "read_orders,read_products,write_discounts,write_script_tags,write_themes";
 const HOST = (process.env.HOST || "").replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();

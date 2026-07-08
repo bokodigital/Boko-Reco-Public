@@ -1,0 +1,17 @@
+Build a "no theme-app-extension" storefront setup so merchants get all widgets WITHOUT shopify app deploy. Implement all of this, syntax-check, then republish to production. Keep the existing Customizer + funnel + recommend engine intact.
+
+1) SCOPES: add write_themes. Update BOTH the SCOPES secret/env used by the auth flow AND access_scopes in shopify.app.toml so scopes become: read_orders,read_products,write_discounts,write_script_tags,write_themes. (Merchants re-consent on next app open.)
+
+2) SELECTED FOR YOU via Admin REST Asset API (theme files):
+Add a session-protected admin route POST /setup-theme that, on the shop's MAIN theme (role=main), writes two assets:
+ - sections/boko-selected-for-you.liquid = the Selected For You widget as a THEME SECTION. Adapt the existing reco-widget "selected-for-you" block into a section: use section.settings (not block.settings), remove block.shopify_attributes, keep a {% schema %}. It must: fetch "For You" from /apps/reco/recommend, fetch Browse tabs from native /collections/{handle}/products.json, read /apps/reco/config for fonts/sizes/colours, honor an exclude_collections setting, and tag adds with properties _boko_source:"selected-for-you-page".
+ - templates/page.selected-for-you.json = {"sections":{"main":{"type":"boko-selected-for-you","settings":{}}},"order":["main"]}
+Return JSON success/failure. (Note in the response: works only after the merchant re-consents to write_themes.)
+
+3) RAIL + CART via ScriptTag (uses write_script_tags, already granted):
+ - Add public route GET /storefront.js serving JS that: on product pages renders the AI product rail (fetch /apps/reco/recommend?anchor=<product id>, tag adds _boko_reco:"pdp"); and renders cart-drawer suggestions (fetch /apps/reco/recommend, tag adds _boko_reco:"cart_drawer"); both read /apps/reco/config for styling.
+ - Add admin route POST /enable-widgets that registers a Shopify ScriptTag (src = <app_url>/storefront.js, event onload, display_scope online_store) if not already present, and POST /disable-widgets to remove it.
+
+4) DASHBOARD: add a "Storefront setup" panel with: a button "Install Selected For You page to my theme" -> POST /setup-theme (then instruct the merchant to create a Page and assign the 'selected-for-you' template), and a toggle "Enable rail & cart widgets" -> POST /enable-widgets / /disable-widgets. Show current status.
+
+5) Republish to production. Everything is server-only — do NOT run shopify app deploy.
