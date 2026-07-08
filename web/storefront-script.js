@@ -12,6 +12,19 @@ const STOREFRONT_JS = `(function(){
   if (window.__bokoStorefrontLoaded) return; window.__bokoStorefrontLoaded = 1;
   var PROXY = "/apps/reco/recommend";
   var CONFIG_URL = "/apps/reco/config";
+  var TRACK_URL = "/apps/reco/track";
+
+  function sendTrack(event,source,handle){
+    try{
+      var payload=JSON.stringify({event:event,source:source,handle:handle||null});
+      if(navigator.sendBeacon){
+        var blob=new Blob([payload],{type:"application/json"});
+        navigator.sendBeacon(TRACK_URL,blob);
+      } else {
+        fetch(TRACK_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:payload,keepalive:true}).catch(function(){});
+      }
+    }catch(e){}
+  }
 
   function vnum(g){var m=String(g).match(/(\\d+)$/);return m?m[1]:g;}
   function money(n){return "$"+Number(n).toFixed(2);}
@@ -37,8 +50,9 @@ const STOREFRONT_JS = `(function(){
     }
     fetch("/cart.js",{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(c){cartNotify(c.item_count||0);}).catch(function(){cartNotify(0);});
   }
-  function addToCart(variantId,tag,btn){
+  function addToCart(variantId,tag,btn,handle){
     if(btn)btn.disabled=true;
+    sendTrack("add",tag.value,handle);
     var props={};props[tag.key]=tag.value;
     var body={items:[{id:Number(vnum(variantId)),quantity:1,properties:props}]};
     var sec=getSections();if(sec){body.sections=sec;body.sections_url=location.pathname;}
@@ -67,7 +81,7 @@ const STOREFRONT_JS = `(function(){
   function railCard(p,cfg){
     var c=el("<div class='boko-rail__card'><div class='boko-rail__imgwrap'>"+(p.img?"<img loading='lazy' src='"+p.img+"' alt=''>":"")+"<button class='boko-rail__atc' data-label='"+ (cfg.addText?"Add to cart":"Add to cart") +"'>Add to cart</button></div><div class='boko-rail__body'><div class='boko-rail__title'></div><div class='boko-rail__price'></div><div class='boko-rail__opts'></div></div></div>");
     var titleEl=c.querySelector(".boko-rail__title");
-    if(p.handle){var a=document.createElement("a");a.href="/products/"+p.handle;a.style.color="inherit";a.style.textDecoration="none";a.textContent=p.title||"";titleEl.appendChild(a);}
+    if(p.handle){var a=document.createElement("a");a.href="/products/"+p.handle;a.style.color="inherit";a.style.textDecoration="none";a.textContent=p.title||"";a.addEventListener("click",function(){sendTrack("click","pdp",p.handle);});titleEl.appendChild(a);}
     else{titleEl.textContent=p.title||"";}
     var priceEl=c.querySelector(".boko-rail__price"); priceEl.textContent=money(p.price);
     var atc=c.querySelector(".boko-rail__atc"), optsEl=c.querySelector(".boko-rail__opts");
@@ -93,7 +107,7 @@ const STOREFRONT_JS = `(function(){
       };
       draw();
     }
-    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"pdp"},this);});
+    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"pdp"},this,p.handle);});
     return c;
   }
   function styleRail(root,cfg){
@@ -178,11 +192,13 @@ const STOREFRONT_JS = `(function(){
   }
   function cartCard(p){
     var c=el("<div class='boko-cart__card'>"+(p.img?"<img loading='lazy' src='"+p.img+"' alt=''>":"<div style='height:130px;background:#f3f1ee;border-radius:6px'></div>")+"<div class='boko-cart__title'></div><div class='boko-cart__price'></div><button class='boko-cart__add' data-label='Add'>Add</button></div>");
-    var titleEl=c.querySelector(".boko-cart__title");titleEl.textContent=p.title||"";
+    var titleEl=c.querySelector(".boko-cart__title");
+    if(p.handle){var a=document.createElement("a");a.href="/products/"+p.handle;a.style.color="inherit";a.style.textDecoration="none";a.textContent=p.title||"";a.addEventListener("click",function(){sendTrack("click","cart_drawer",p.handle);});titleEl.appendChild(a);}
+    else{titleEl.textContent=p.title||"";}
     c.querySelector(".boko-cart__price").textContent=money(p.price);
     var addBtn=c.querySelector(".boko-cart__add");
     var vid=p.variantId;
-    addBtn.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"cart_drawer"},this);});
+    addBtn.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"cart_drawer"},this,p.handle);});
     return c;
   }
   function findCartHost(){for(var i=0;i<CART_HOSTS.length;i++){var e=document.querySelector(CART_HOSTS[i]);if(e)return e;}return null;}
