@@ -1133,6 +1133,7 @@ app.post("/webhooks/compliance", async (req, res) => {
 
 // ---------- Entry / health ----------
 app.get("/", async (req, res) => {
+  res.set("Cache-Control","no-store, max-age=0");
   const shop = req.query.shop;
   if (validShop(shop)) {
     const token = await getToken(shop);
