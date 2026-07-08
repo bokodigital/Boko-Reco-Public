@@ -1,1 +1,2 @@
 - [Boko Reco app conventions](boko-reco-conventions.md) — Replit DB storage keys, collection-exclusion filtering approach, and workflow/port setup for this Shopify app.
+- [No-theme-app-extension storefront setup](boko-storefront-no-extension.md) — install widgets via Admin REST Asset API + ScriptTag instead of `shopify app deploy`; watch for conflicting auto-cleanup logic.

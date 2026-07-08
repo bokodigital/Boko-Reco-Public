@@ -35,7 +35,7 @@ const db = new Database();
 
 // ---- token store (per shop) — handles both @replit/database return styles ----
 const k = (shop) => "shop:" + shop;
-async function rawTok(shop) { const r = await db.get(k(shop)); if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value : null; return r || null; } async function refreshExpiring(shop, t) { if (!t || !t.refresh_token) return t; try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "refresh_token", refresh_token: t.refresh_token }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || t.refresh_token, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return t; } async function migrateToken(shop, oldToken) { try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token: oldToken, subject_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", expiring: "1" }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || null, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return { access_token: oldToken }; } async function getToken(shop) { let t = await rawTok(shop); if (!t) return null; if (typeof t === "string") { t = await migrateToken(shop, t); } if (t.expires_at && Date.now() > (t.expires_at - 120000)) t = await refreshExpiring(shop, t); return (t && t.access_token) || null; } async function setToken(shop, token) { await db.set(k(shop), token); cleanupScriptTags(shop).catch(function() {}); }
+async function rawTok(shop) { const r = await db.get(k(shop)); if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value : null; return r || null; } async function refreshExpiring(shop, t) { if (!t || !t.refresh_token) return t; try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "refresh_token", refresh_token: t.refresh_token }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || t.refresh_token, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return t; } async function migrateToken(shop, oldToken) { try { const r = await fetch("https://" + shop + "/admin/oauth/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" }, body: new URLSearchParams({ client_id: API_KEY, client_secret: API_SECRET, grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token: oldToken, subject_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", requested_token_type: "urn:shopify:params:oauth:token-type:offline-access-token", expiring: "1" }) }).then((x) => x.json()); if (r && r.access_token) { const n = { access_token: r.access_token, refresh_token: r.refresh_token || null, expires_at: Date.now() + ((r.expires_in || 3600) * 1000) }; await db.set(k(shop), n); return n; } } catch (e) {} return { access_token: oldToken }; } async function getToken(shop) { let t = await rawTok(shop); if (!t) return null; if (typeof t === "string") { t = await migrateToken(shop, t); } if (t.expires_at && Date.now() > (t.expires_at - 120000)) t = await refreshExpiring(shop, t); return (t && t.access_token) || null; } async function setToken(shop, token) { await db.set(k(shop), token); }
 async function delToken(shop) { try { await db.delete(k(shop)); } catch (e) {} }
 
 const validShop = (s) => /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(s || "");
@@ -49,20 +49,38 @@ async function gql(shop, token, query, variables) {
   return r.json();
 }
 
-// ---- Script Tag cleanup — removes any legacy /storefront.js script tags ----
-async function cleanupScriptTags(shop) {
-  const token = await getToken(shop);
-  if (!token) return;
-  const existing = await gql(shop, token,
-    `{ scriptTags(first:20){ edges{ node{ id src } } } }`, {});
-  const tags = (existing.data && existing.data.scriptTags && existing.data.scriptTags.edges) || [];
-  for (const e of tags) {
-    if (e.node && e.node.src && e.node.src.includes("/storefront.js")) {
-      await gql(shop, token,
-        `mutation($id:ID!){ scriptTagDelete(id:$id){ deletedScriptTagId userErrors{ message } } }`,
-        { id: e.node.id });
-    }
-  }
+// ---- Admin REST helper (used for theme file installs — no GraphQL Theme Asset API) ----
+async function restCall(shop, token, path, method, body) {
+  const r = await fetch(`https://${shop}/admin/api/${API}/${path}`, {
+    method: method || "GET",
+    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null;
+  try { json = await r.json(); } catch (e) {}
+  return { ok: r.ok, status: r.status, json };
+}
+
+async function getMainTheme(shop, token) {
+  const r = await restCall(shop, token, "themes.json", "GET");
+  const themes = (r.json && r.json.themes) || [];
+  return themes.find((t) => t.role === "main") || null;
+}
+
+async function putThemeAsset(shop, token, themeId, key, value) {
+  return restCall(shop, token, `themes/${themeId}/assets.json`, "PUT", { asset: { key, value } });
+}
+
+async function getThemeAsset(shop, token, themeId, key) {
+  const r = await restCall(shop, token, `themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`, "GET");
+  return r.ok && r.json && r.json.asset ? r.json.asset : null;
+}
+
+// ---- Storefront widgets ScriptTag (rail + cart drawer, no theme-app-extension) ----
+async function findStorefrontScriptTag(shop, token) {
+  const j = await gql(shop, token, `{ scriptTags(first:20){ edges{ node{ id src } } } }`, {});
+  const edges = (j.data && j.data.scriptTags && j.data.scriptTags.edges) || [];
+  return edges.map((e) => e.node).find((n) => n.src && n.src.includes("/storefront.js")) || null;
 }
 
 // ---- Billing (gated by BILLING_ENABLED env flag) ----
@@ -469,6 +487,118 @@ app.post("/settings", express.json(), async (req, res) => {
   }
 });
 
+// ---------- No-theme-app-extension storefront setup ----------
+// Resolves the shop + admin token from either a dashboard session token
+// (Authorization: Bearer <id_token>) — used by /setup-theme, /enable-widgets,
+// /disable-widgets, /storefront-status.
+async function shopAndTokenFromRequest(req) {
+  const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
+  const shop = shopFromSessionToken(idToken);
+  if (!shop) return { shop: null, token: null };
+  let token = await getToken(shop);
+  if (!token) token = await tokenExchange(shop, idToken);
+  return { shop, token };
+}
+
+const SFY_SECTION_KEY = "sections/boko-selected-for-you.liquid";
+const SFY_TEMPLATE_KEY = "templates/page.selected-for-you.json";
+
+app.post("/setup-theme", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const { shop, token } = await shopAndTokenFromRequest(req);
+    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
+    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
+    const theme = await getMainTheme(shop, token);
+    if (!theme) return res.status(200).send(JSON.stringify({ ok: false, error: "Could not find the shop's main theme." }));
+    const sectionRes = await putThemeAsset(shop, token, theme.id, SFY_SECTION_KEY, SFY_SECTION_LIQUID);
+    if (!sectionRes.ok) {
+      const msg = (sectionRes.json && sectionRes.json.errors) ? JSON.stringify(sectionRes.json.errors) : ("HTTP " + sectionRes.status);
+      const needsScope = sectionRes.status === 403 || sectionRes.status === 401;
+      return res.status(200).send(JSON.stringify({ ok: false, error: needsScope ? "The store hasn't approved the write_themes permission yet. Reopen the app from Shopify Admin to re-consent, then try again." : ("Could not write the section file: " + msg) }));
+    }
+    const templateRes = await putThemeAsset(shop, token, theme.id, SFY_TEMPLATE_KEY, JSON.stringify(SFY_PAGE_TEMPLATE, null, 2));
+    if (!templateRes.ok) {
+      const msg = (templateRes.json && templateRes.json.errors) ? JSON.stringify(templateRes.json.errors) : ("HTTP " + templateRes.status);
+      return res.status(200).send(JSON.stringify({ ok: false, error: "Section installed, but the page template failed to write: " + msg }));
+    }
+    res.status(200).send(JSON.stringify({
+      ok: true,
+      themeName: theme.name,
+      instructions: "Now go to Shopify Admin \u2192 Online Store \u2192 Pages \u2192 Add page (or edit one), name it \u201cSelected For You\u201d, and under Theme template choose \u201cselected-for-you\u201d, then Save.",
+    }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
+  }
+});
+
+app.get("/storefront-status", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const { shop, token } = await shopAndTokenFromRequest(req);
+    if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
+    if (!token) return res.status(200).send(JSON.stringify({ error: "not installed" }));
+    const theme = await getMainTheme(shop, token);
+    const [asset, scriptTag] = await Promise.all([
+      theme ? getThemeAsset(shop, token, theme.id, SFY_SECTION_KEY) : Promise.resolve(null),
+      findStorefrontScriptTag(shop, token),
+    ]);
+    res.status(200).send(JSON.stringify({
+      themeName: theme ? theme.name : null,
+      themeInstalled: !!asset,
+      widgetsEnabled: !!scriptTag,
+    }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ error: e.message }));
+  }
+});
+
+app.post("/enable-widgets", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const { shop, token } = await shopAndTokenFromRequest(req);
+    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
+    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
+    const existing = await findStorefrontScriptTag(shop, token);
+    if (existing) return res.status(200).send(JSON.stringify({ ok: true, alreadyEnabled: true }));
+    const j = await gql(shop, token,
+      `mutation($input:ScriptTagInput!){ scriptTagCreate(input:$input){ scriptTag{ id src } userErrors{ field message } } }`,
+      { input: { src: HOST + "/storefront.js", displayScope: "ONLINE_STORE", cache: false } });
+    const userErrors = j.data && j.data.scriptTagCreate && j.data.scriptTagCreate.userErrors;
+    if (userErrors && userErrors.length) return res.status(200).send(JSON.stringify({ ok: false, error: userErrors.map((e) => e.message).join("; ") }));
+    if (j.errors) return res.status(200).send(JSON.stringify({ ok: false, error: JSON.stringify(j.errors) }));
+    res.status(200).send(JSON.stringify({ ok: true }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
+  }
+});
+
+app.post("/disable-widgets", async (req, res) => {
+  res.set("Content-Type", "application/json");
+  try {
+    const { shop, token } = await shopAndTokenFromRequest(req);
+    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
+    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
+    const existing = await findStorefrontScriptTag(shop, token);
+    if (!existing) return res.status(200).send(JSON.stringify({ ok: true, alreadyDisabled: true }));
+    const j = await gql(shop, token,
+      `mutation($id:ID!){ scriptTagDelete(id:$id){ deletedScriptTagId userErrors{ message } } }`,
+      { id: existing.id });
+    const userErrors = j.data && j.data.scriptTagDelete && j.data.scriptTagDelete.userErrors;
+    if (userErrors && userErrors.length) return res.status(200).send(JSON.stringify({ ok: false, error: userErrors.map((e) => e.message).join("; ") }));
+    res.status(200).send(JSON.stringify({ ok: true }));
+  } catch (e) {
+    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
+  }
+});
+
+// ---------- Public storefront widgets script (served via ScriptTag, no theme-app-extension) ----------
+app.get("/storefront.js", (req, res) => {
+  res.set("Content-Type", "application/javascript; charset=utf-8");
+  res.set("Cache-Control", "public, max-age=300");
+  res.status(200).send(STOREFRONT_JS);
+});
+
 const DASHBOARD = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 __APP_BRIDGE__
 <title>Boko Recommendations — Dashboard</title>
@@ -520,11 +650,29 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 .cz-save{display:flex;align-items:center;gap:12px}
 .cz-save button{font:inherit;font-weight:600;background:var(--ink);color:#fff;border:none;border-radius:8px;padding:10px 20px;cursor:pointer}
 .cz-status{font-size:13px;color:var(--muted)}
+.sf-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.sf-card h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.sf-card p{margin:0 0 14px}
+.sf-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sf-row button{font:inherit;font-weight:600;background:var(--ink);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer}
+.sf-row button:disabled{opacity:.5;cursor:default}
+.sf-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px;background:#f0f2f5;color:var(--muted)}
+.sf-status.on{background:#e6f7ea;color:#1f7a45}
+.sf-msg{font-size:13px;color:var(--muted);margin-top:10px}
+.sf-msg.err{color:#7a1d13}
+.switch{position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;transition:.15s}
+.slider:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.15s}
+input:checked+.slider{background:var(--ink)}
+input:checked+.slider:before{transform:translateX(18px)}
+input:disabled+.slider{opacity:.5;cursor:default}
 </style></head><body><div class="wrap">
 <h1>Boko AI Recommendations</h1>
 <div class="tabs">
   <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
   <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
+  <button class="tab-btn" id="tabBtnSf" type="button">Storefront setup</button>
 </div>
 <div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
@@ -565,6 +713,21 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 </div>
 <div class="cz-save"><button id="czSaveBtn" type="button">Save changes</button><span class="cz-status" id="czStatus"></span></div>
 </div>
+<div id="tab-storefront" style="display:none">
+<p class="sub">Install widgets directly on your storefront — no app-embed or theme editor step required.</p>
+<div class="sf-card">
+  <h3>Selected For You page <span class="sf-status" id="sfThemeStatus">checking…</span></h3>
+  <p class="sub" style="margin:0 0 14px">Adds a page section and template to your current theme (<span id="sfThemeName">–</span>) so shoppers can browse a personalized "Selected For You" page.</p>
+  <div class="sf-row"><button id="sfInstallBtn" type="button">Install to my theme</button></div>
+  <div class="sf-msg" id="sfThemeMsg"></div>
+</div>
+<div class="sf-card">
+  <h3>Product page rail &amp; cart drawer widgets <span class="sf-status" id="sfWidgetStatus">checking…</span></h3>
+  <p class="sub" style="margin:0 0 14px">Adds a small script to your storefront that shows a recommendation rail on product pages and a carousel in the cart drawer — no theme edits needed.</p>
+  <div class="sf-row"><label class="switch"><input type="checkbox" id="sfWidgetToggle" disabled><span class="slider"></span></label><span class="sub" style="margin:0">Enable rail &amp; cart widgets</span></div>
+  <div class="sf-msg" id="sfWidgetMsg"></div>
+</div>
+</div>
 <script>
 var CUR="";
 function fmt(n){try{return new Intl.NumberFormat(undefined,{style:"currency",currency:CUR||"USD"}).format(n||0);}catch(e){return "$"+(Number(n||0)).toFixed(2);}}
@@ -573,6 +736,11 @@ async function authedFetch(url){
   var headers={Accept:"application/json"};
   try{ if(window.shopify&&shopify.idToken){ var t=await shopify.idToken(); headers.Authorization="Bearer "+t; } }catch(e){}
   return fetch(url,{headers:headers}).then(function(r){return r.json();});
+}
+async function authedPost(url){
+  var headers={Accept:"application/json","Content-Type":"application/json"};
+  try{ if(window.shopify&&shopify.idToken){ var t=await shopify.idToken(); headers.Authorization="Bearer "+t; } }catch(e){}
+  return fetch(url,{method:"POST",headers:headers}).then(function(r){return r.json();});
 }
 function load(){
   var days=document.getElementById("days").value;
@@ -678,15 +846,69 @@ document.getElementById("czSaveBtn").addEventListener("click",function(){
     }).catch(function(){ status.textContent="Couldn't save changes."; });
   })();
 });
+var sfLoaded=false;
+function sfSetStatus(el,on,onText,offText){
+  el.textContent=on?onText:offText;
+  el.classList.toggle("on",!!on);
+}
+function loadStorefront(){
+  if(sfLoaded) return;
+  sfLoaded=true;
+  authedFetch("/storefront-status").then(function(d){
+    if(d.error){
+      document.getElementById("sfThemeMsg").innerHTML="<span class='err'>Couldn't load status: "+d.error+"</span>";
+      return;
+    }
+    document.getElementById("sfThemeName").textContent=d.themeName||"–";
+    sfSetStatus(document.getElementById("sfThemeStatus"),d.themeInstalled,"Installed","Not installed");
+    sfSetStatus(document.getElementById("sfWidgetStatus"),d.widgetsEnabled,"Enabled","Disabled");
+    var toggle=document.getElementById("sfWidgetToggle");
+    toggle.checked=!!d.widgetsEnabled;
+    toggle.disabled=false;
+  }).catch(function(){
+    document.getElementById("sfThemeMsg").innerHTML="<span class='err'>Couldn't load status.</span>";
+  });
+}
+document.getElementById("sfInstallBtn").addEventListener("click",function(){
+  var btn=document.getElementById("sfInstallBtn");
+  var msg=document.getElementById("sfThemeMsg");
+  btn.disabled=true; msg.className="sf-msg"; msg.textContent="Installing…";
+  authedPost("/setup-theme").then(function(d){
+    btn.disabled=false;
+    if(!d.ok){ msg.className="sf-msg err"; msg.textContent=d.error||"Something went wrong."; return; }
+    sfSetStatus(document.getElementById("sfThemeStatus"),true,"Installed","Not installed");
+    document.getElementById("sfThemeName").textContent=d.themeName||"–";
+    msg.className="sf-msg"; msg.textContent=d.instructions||"Installed.";
+  }).catch(function(){
+    btn.disabled=false; msg.className="sf-msg err"; msg.textContent="Couldn't reach the server.";
+  });
+});
+document.getElementById("sfWidgetToggle").addEventListener("change",function(){
+  var toggle=this; var msg=document.getElementById("sfWidgetMsg");
+  var enabling=toggle.checked;
+  toggle.disabled=true; msg.className="sf-msg"; msg.textContent=enabling?"Enabling…":"Disabling…";
+  authedPost(enabling?"/enable-widgets":"/disable-widgets").then(function(d){
+    toggle.disabled=false;
+    if(!d.ok){ msg.className="sf-msg err"; msg.textContent=d.error||"Something went wrong."; toggle.checked=!enabling; return; }
+    sfSetStatus(document.getElementById("sfWidgetStatus"),enabling,"Enabled","Disabled");
+    msg.textContent="";
+  }).catch(function(){
+    toggle.disabled=false; msg.className="sf-msg err"; msg.textContent="Couldn't reach the server."; toggle.checked=!enabling;
+  });
+});
 function showTab(name){
   document.getElementById("tab-performance").style.display=(name==="perf")?"":"none";
   document.getElementById("tab-customizer").style.display=(name==="cz")?"":"none";
+  document.getElementById("tab-storefront").style.display=(name==="sf")?"":"none";
   document.getElementById("tabBtnPerf").classList.toggle("active",name==="perf");
   document.getElementById("tabBtnCz").classList.toggle("active",name==="cz");
+  document.getElementById("tabBtnSf").classList.toggle("active",name==="sf");
   if(name==="cz") loadCustomizer();
+  if(name==="sf") loadStorefront();
 }
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
+document.getElementById("tabBtnSf").addEventListener("click",function(){showTab("sf");});
 </script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
