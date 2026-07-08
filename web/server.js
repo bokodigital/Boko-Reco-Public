@@ -909,7 +909,177 @@ function showTab(name){
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
 document.getElementById("tabBtnSf").addEventListener("click",function(){showTab("sf");});
-</script></body></html>`;
+</script><script>
+/* Boko dashboard enhancer — Customizer redesign + Widgets tab. Purely additive. */
+(function(){
+  "use strict";
+  try{
+  if(window.__bokoEnh) return; window.__bokoEnh=1;
+  function byId(id){return document.getElementById(id);}
+  var COMPS=[
+    ["rail","Product page rail","The “You may also like” row on product pages."],
+    ["cart","Cart drawer carousel","Suggestions shown inside the cart drawer."],
+    ["sfy","Selected For You collection","The full recommendations page grid."]
+  ];
+
+  var css=""
+   +".bkz-wrap{max-width:900px}"
+   +".bkz-card{border:1px solid #e4e4ec;border-radius:14px;margin:14px 0;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(20,20,50,.05)}"
+   +".bkz-head{display:flex;align-items:center;gap:12px;padding:15px 18px;cursor:pointer;user-select:none}"
+   +".bkz-head:hover{background:#faf9ff}"
+   +".bkz-dot{width:10px;height:10px;border-radius:50%;background:#6b4dff;flex:0 0 auto}"
+   +".bkz-htxt{flex:1;min-width:0}"
+   +".bkz-htxt b{display:block;font-size:15px;color:#191932;line-height:1.3}"
+   +".bkz-htxt span{font-size:12.5px;color:#70708a}"
+   +".bkz-chev{transition:transform .2s;color:#a2a2b8;font-size:20px;line-height:1}"
+   +".bkz-card.open .bkz-chev{transform:rotate(90deg)}"
+   +".bkz-body{display:none;padding:2px 18px 18px}"
+   +".bkz-card.open .bkz-body{display:block}"
+   +".bkz-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}"
+   +".bkz-field label{display:block;font-size:12px;font-weight:600;color:#565672;margin:0 0 4px}"
+   +".bkz-field input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #dadae4;border-radius:9px;font-size:13px;background:#fff}"
+   +".bkz-field input:focus{outline:none;border-color:#6b4dff;box-shadow:0 0 0 3px rgba(107,77,255,.12)}"
+   +".bkz-field input[type=color]{padding:3px;height:38px;cursor:pointer}"
+   +".bkz-adv{margin-top:14px;border-top:1px dashed #e4e4ec;padding-top:12px}"
+   +".bkz-adv>summary{cursor:pointer;font-size:12.5px;font-weight:700;color:#6b4dff;list-style:none;display:inline-flex;align-items:center;gap:6px}"
+   +".bkz-adv>summary::-webkit-details-marker{display:none}"
+   +".bkz-adv>summary:before{content:'\\002B';font-weight:700}"
+   +".bkz-adv[open]>summary:before{content:'\\2212'}"
+   +".bkz-adv[open]>summary{margin-bottom:12px}"
+   +".bkz-prev{border:1px solid #ececf3;border-radius:12px;padding:16px;margin:4px 0 16px;background:#fbfbfe}"
+   +".bkz-prev .pv-h{font-weight:700;margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#8a8aa2}"
+   +".bkz-prev .pv-card{border:1px solid #ededf2;border-radius:10px;overflow:hidden;max-width:180px;background:#fff}"
+   +".bkz-prev .pv-img{height:110px;background:linear-gradient(135deg,#efeafe,#e7f0ff)}"
+   +".bkz-prev .pv-b{padding:10px}"
+   +".bkz-prev .pv-t{margin:0 0 6px;font-size:14px;color:#191932}"
+   +".bkz-prev .pv-p b{color:#111}"
+   +".bkz-prev .pv-p s{color:#b6b6c4;margin-left:6px;font-weight:400}"
+   +".bkz-prev .pv-btn{margin-top:10px;display:inline-block;padding:8px 14px;border-radius:8px;background:#111;color:#fff;font-size:12px}"
+   +".bkz-note{font-size:11px;color:#a2a2b8;margin-top:10px;line-height:1.4}"
+   +".bkz-wtab .card{max-width:520px}"
+   +"@media(max-width:640px){.bkz-grid2{grid-template-columns:1fr}}";
+  var st=document.createElement("style"); st.textContent=css; document.head.appendChild(st);
+
+  function labelText(f){ var l=f.querySelector("label"); return l?(l.textContent||"").toLowerCase():""; }
+  function isAdvanced(f){ var t=labelText(f); return t.indexOf("color")>-1||t.indexOf("colour")>-1||t.indexOf("size")>-1; }
+  function fieldByLabel(scope,txt){ var fs=scope.querySelectorAll(".bkz-field,.cz-field"); for(var i=0;i<fs.length;i++){ if(labelText(fs[i]).indexOf(txt)>-1) return fs[i].querySelector("input"); } return null; }
+
+  function buildPreview(comp){
+    var w=document.createElement("div"); w.className="bkz-prev"; w.setAttribute("data-prev",comp);
+    w.innerHTML="<div class='pv-h'>Live preview</div>"
+      +"<div class='pv-card'><div class='pv-img'></div><div class='pv-b'>"
+      +"<div class='pv-t'>Sample product</div>"
+      +"<div class='pv-p'><b>$49.00</b><s>$69.00</s></div>"
+      +"<div class='pv-btn'>Add to cart</div></div></div>"
+      +"<div class='bkz-note'>Colours &amp; sizes update instantly and match your storefront. The font shown is illustrative — the live widget uses your theme's own font.</div>";
+    return w;
+  }
+  function applyPreview(card){
+    try{
+      var pv=card.querySelector("[data-prev]"); if(!pv) return;
+      var t=pv.querySelector(".pv-t"), pb=pv.querySelector(".pv-p b"), ps=pv.querySelector(".pv-p s"), btn=pv.querySelector(".pv-btn");
+      var tSize=fieldByLabel(card,"title size"), pSize=fieldByLabel(card,"price size");
+      var tCol=fieldByLabel(card,"title color")||fieldByLabel(card,"title colour");
+      var pCol=fieldByLabel(card,"price color")||fieldByLabel(card,"price colour");
+      var saleCol=fieldByLabel(card,"sale color")||fieldByLabel(card,"sale colour");
+      var atcBg=fieldByLabel(card,"cart background"), atcTx=fieldByLabel(card,"cart text");
+      if(t&&tSize&&tSize.value) t.style.fontSize=parseFloat(tSize.value)+"px";
+      if(t&&tCol&&tCol.value) t.style.color=tCol.value;
+      if(pb&&pSize&&pSize.value) pb.style.fontSize=parseFloat(pSize.value)+"px";
+      if(pb&&pCol&&pCol.value) pb.style.color=pCol.value;
+      if(ps&&saleCol&&saleCol.value) ps.style.color=saleCol.value;
+      if(btn&&atcBg&&atcBg.value) btn.style.background=atcBg.value;
+      if(btn&&atcTx&&atcTx.value) btn.style.color=atcTx.value;
+    }catch(e){}
+  }
+
+  function enhanceCz(){
+    try{
+      var grid=byId("czGrid"); if(!grid) return;
+      if(grid.getAttribute("data-bkz")==="1") return;
+      var fields=[].slice.call(grid.querySelectorAll(".cz-field"));
+      if(!fields.length) return;
+      grid.setAttribute("data-bkz","1");
+      var coll=byId("czCollections");
+      var wrap=document.createElement("div"); wrap.className="bkz-wrap";
+      COMPS.forEach(function(c,idx){
+        var comp=c[0];
+        var mine=fields.filter(function(f){ var i=f.querySelector("[data-comp]"); return i&&i.getAttribute("data-comp")===comp; });
+        if(!mine.length) return;
+        var card=document.createElement("div"); card.className="bkz-card"+(idx===0?" open":"");
+        var head=document.createElement("div"); head.className="bkz-head";
+        head.innerHTML="<span class='bkz-dot'></span><span class='bkz-htxt'><b>"+c[1]+"</b><span>"+c[2]+"</span></span><span class='bkz-chev'>›</span>";
+        head.addEventListener("click",function(){ card.classList.toggle("open"); });
+        var body=document.createElement("div"); body.className="bkz-body";
+        body.appendChild(buildPreview(comp));
+        var basic=document.createElement("div"); basic.className="bkz-grid2";
+        var adv=document.createElement("details"); adv.className="bkz-adv";
+        var sum=document.createElement("summary"); sum.textContent="Advanced — sizes & colours"; adv.appendChild(sum);
+        var advGrid=document.createElement("div"); advGrid.className="bkz-grid2"; adv.appendChild(advGrid);
+        mine.forEach(function(f){ f.classList.add("bkz-field"); (isAdvanced(f)?advGrid:basic).appendChild(f); });
+        body.appendChild(basic); body.appendChild(adv);
+        if(comp==="sfy"&&coll){
+          var cc=document.createElement("div"); cc.style.marginTop="14px";
+          var h=document.createElement("div"); h.className="bkz-field"; h.innerHTML="<label>Exclude collections from recommendations</label>";
+          cc.appendChild(h); cc.appendChild(coll); body.appendChild(cc);
+        }
+        card.appendChild(head); card.appendChild(body); wrap.appendChild(card);
+        body.addEventListener("input",function(){ applyPreview(card); });
+        setTimeout(function(){ applyPreview(card); },0);
+      });
+      grid.innerHTML=""; grid.appendChild(wrap);
+      setTimeout(function(){ [].forEach.call(document.querySelectorAll(".bkz-card"),applyPreview); },700);
+      setTimeout(function(){ [].forEach.call(document.querySelectorAll(".bkz-card"),applyPreview); },1600);
+    }catch(e){}
+  }
+  try{
+    var g0=byId("czGrid");
+    if(g0){
+      var mo=new MutationObserver(function(){ var g=byId("czGrid"); if(g&&g.getAttribute("data-bkz")!=="1"&&g.querySelector(".cz-field")){ enhanceCz(); } });
+      mo.observe(g0,{childList:true,subtree:true});
+    }
+    setTimeout(function(){ var g=byId("czGrid"); if(g&&g.querySelector(".cz-field")) enhanceCz(); },350);
+  }catch(e){}
+
+  /* ---------- Widgets tab ---------- */
+  try{
+    var czBtn=byId("tabBtnCz");
+    var bar=czBtn?czBtn.parentNode:null;
+    if(bar&&!byId("tabBtnWi")){
+      var b=document.createElement("button"); b.className="tab-btn"; b.id="tabBtnWi"; b.type="button"; b.textContent="Widgets";
+      if(czBtn.nextSibling) bar.insertBefore(b,czBtn.nextSibling); else bar.appendChild(b);
+      var panel=document.createElement("div"); panel.id="tab-widgets"; panel.className="bkz-wtab"; panel.style.display="none";
+      panel.innerHTML="<h2 style='margin:0 0 6px'>Storefront widgets</h2>"
+        +"<p class='sub' style='margin:0 0 16px;color:#70708a'>Turn the product-page rail and cart-drawer carousel on or off across your storefront.</p>";
+      var host=byId("tab-customizer")?byId("tab-customizer").parentNode:document.body;
+      host.appendChild(panel);
+      var row=document.querySelector(".sf-row");
+      var stat=byId("sfWidgetStatus"), msg=byId("sfWidgetMsg");
+      var box=document.createElement("div"); box.className="card"; box.style.padding="18px";
+      var hd=document.createElement("div"); hd.style.cssText="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap";
+      hd.innerHTML="<b style='font-size:15px'>Rail &amp; cart widgets</b>";
+      if(stat) hd.appendChild(stat);
+      box.appendChild(hd);
+      if(row) box.appendChild(row);
+      if(msg) box.appendChild(msg); else { var m=document.createElement("div"); m.id="sfWidgetMsg"; m.className="sf-msg"; box.appendChild(m); }
+      panel.appendChild(box);
+
+      function hideWi(){ var w=byId("tab-widgets"); if(w) w.style.display="none"; var bt=byId("tabBtnWi"); if(bt) bt.classList.remove("active"); }
+      var pB=byId("tabBtnPerf"); if(pB) pB.addEventListener("click",hideWi);
+      if(czBtn) czBtn.addEventListener("click",hideWi);
+      b.addEventListener("click",function(){
+        ["tab-performance","tab-customizer","tab-storefront"].forEach(function(id){ var e=byId(id); if(e) e.style.display="none"; });
+        ["tabBtnPerf","tabBtnCz","tabBtnSf"].forEach(function(id){ var e=byId(id); if(e) e.classList.remove("active"); });
+        var w=byId("tab-widgets"); if(w) w.style.display="";
+        b.classList.add("active");
+        if(typeof window.loadStorefront==="function"){ try{ window.loadStorefront(); }catch(e){} }
+      });
+    }
+  }catch(e){}
+  }catch(err){}
+})();
+</script>
+</body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
