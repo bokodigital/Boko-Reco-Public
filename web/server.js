@@ -909,7 +909,7 @@ function showTab(name){
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
 document.getElementById("tabBtnSf").addEventListener("click",function(){showTab("sf");});
-</script><script>
+
 /* Boko dashboard enhancer — Customizer redesign + Widgets tab. Purely additive. */
 (function(){
   "use strict";
@@ -1078,8 +1078,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
   }catch(e){}
   }catch(err){}
 })();
-</script>
-</body></html>`;
+</script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
