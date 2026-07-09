@@ -525,7 +525,7 @@ app.post("/setup-theme", async (req, res) => {
     res.status(200).send(JSON.stringify({
       ok: true,
       themeName: theme.name,
-      instructions: "Installed. Now open your theme editor (Online Store > Themes > Customize), click Add section, choose 'Selected For You', place it on any page, then Save.",
+      instructions: "Now go to Shopify Admin \u2192 Online Store \u2192 Pages \u2192 Add page (or edit one), name it \u201cSelected For You\u201d, and under Theme template choose \u201cselected-for-you\u201d, then Save.",
     }));
   } catch (e) {
     res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
@@ -716,9 +716,9 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div id="tab-storefront" style="display:none">
 <p class="sub">Install widgets directly on your storefront — no app-embed or theme editor step required.</p>
 <div class="sf-card">
-  <h3>Selected For You section <span class="sf-status" id="sfThemeStatus">checking…</span></h3>
-  <p class="sub" style="margin:0 0 14px">One click adds the 'Selected For You' section to your live theme (<span id="sfThemeName">–</span>). Then in Shopify: Online Store &rarr; Themes &rarr; Customize &rarr; Add section &rarr; 'Selected For You', and place it on any page.</p>
-  <div class="sf-row"><button id="sfInstallBtn" type="button">Add to my theme</button></div>
+  <h3>Selected For You page <span class="sf-status" id="sfThemeStatus">checking…</span></h3>
+  <p class="sub" style="margin:0 0 14px">Adds a page section and template to your current theme (<span id="sfThemeName">–</span>) so shoppers can browse a personalized "Selected For You" page.</p>
+  <div class="sf-row"><button id="sfInstallBtn" type="button">Install to my theme</button></div>
   <div class="sf-msg" id="sfThemeMsg"></div>
 </div>
 <div class="sf-card">
@@ -951,7 +951,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +"#czSaveBtn:hover,.sf-row button:hover{filter:brightness(.93);}"
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
- var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='';
+ var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);
  function val(id,d){var e=document.getElementById(id);var v=e&&e.value!=null?(''+e.value).trim():'';return v||d;}
  function lum(hex){hex=(''+hex).replace('#','');if(hex.length===3)hex=hex.replace(/./g,'$&$&');var n=parseInt(hex,16);if(isNaN(n))return 0;return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255;}
  function wkey(card){var i=card.querySelector('input[id^="cz-"]');if(!i)return null;var m=/^cz-([a-z]+)-/.exec(i.id);return m?m[1]:null;}

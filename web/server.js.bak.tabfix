@@ -951,7 +951,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +"#czSaveBtn:hover,.sf-row button:hover{filter:brightness(.93);}"
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
- var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='';
+ var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);
  function val(id,d){var e=document.getElementById(id);var v=e&&e.value!=null?(''+e.value).trim():'';return v||d;}
  function lum(hex){hex=(''+hex).replace('#','');if(hex.length===3)hex=hex.replace(/./g,'$&$&');var n=parseInt(hex,16);if(isNaN(n))return 0;return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255;}
  function wkey(card){var i=card.querySelector('input[id^="cz-"]');if(!i)return null;var m=/^cz-([a-z]+)-/.exec(i.id);return m?m[1]:null;}
