@@ -716,9 +716,10 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div id="tab-storefront" style="display:none">
 <p class="sub">Install widgets directly on your storefront — no app-embed or theme editor step required.</p>
 <div class="sf-card">
-  <h3>Selected For You section</h3>
-        <p class="sub" style="margin:0 0 14px">Add a personalised recommendations section anywhere in your theme &mdash; no code needed. In Shopify: Online Store &rarr; Themes &rarr; Customize &rarr; Add section &rarr; Apps &rarr; 'Selected For You' &rarr; place it on any page &rarr; Save.</p>
-        <div style="display:none"><span id="sfThemeName"></span><span id="sfThemeStatus"></span><button id="sfInstallBtn" type="button"></button><div class="sf-msg" id="sfThemeMsg"></div></div>
+  <h3>Selected For You section <span class="sf-status" id="sfThemeStatus">checking…</span></h3>
+  <p class="sub" style="margin:0 0 14px">One click adds the 'Selected For You' section to your live theme (<span id="sfThemeName">–</span>). Then in Shopify: Online Store &rarr; Themes &rarr; Customize &rarr; Add section &rarr; 'Selected For You', and place it on any page.</p>
+  <div class="sf-row"><button id="sfInstallBtn" type="button">Add to my theme</button></div>
+  <div class="sf-msg" id="sfThemeMsg"></div>
 </div>
 <div class="sf-card">
   <h3>Product page rail &amp; cart drawer widgets <span class="sf-status" id="sfWidgetStatus">checking…</span></h3>
