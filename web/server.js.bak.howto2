@@ -680,52 +680,39 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <summary>How to use <span class="chev">&#9658;</span></summary>
 <div class="how-to__body">
 <ol class="how-to__list">
-  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It automatically shows each shopper products they are likely to want &mdash; a "You may also like" row on product pages, a strip inside the cart, and a personalised "Selected For You" page &mdash; to help you sell more. You can reopen this app any time from <strong>Apps &rarr; AI Recommendations</strong> in your Shopify admin.</div></li>
+  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It automatically shows each shopper products they are likely to want &mdash; a "You may also like" row on product pages, and a recommendations strip inside the cart &mdash; to help you sell more. Follow the steps below to switch it on, style it, then track your results.</div></li>
   <li><strong>Step 1 &mdash; Show recommendations on product pages</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>In your Shopify admin, open <strong>Online Store &rarr; Themes</strong>.</li>
       <li>On your live theme, click the <strong>Customize</strong> button.</li>
-      <li>At the top of the editor, click the page name and choose a <strong>Product</strong> page.</li>
-      <li>In the left sidebar, click <strong>Add block</strong> where you want the recommendations.</li>
-      <li>Under <strong>Apps</strong>, choose <strong>AI Recommendations</strong>.</li>
-      <li>Click <strong>Save</strong> (top right).</li>
+      <li>At the very top of the editor, click the page name and choose a <strong>Product</strong> page (a "Default product" template).</li>
+      <li>In the left sidebar, click <strong>Add block</strong> in the spot where you want the recommendations to appear.</li>
+      <li>Under the <strong>Apps</strong> group, choose <strong>AI Recommendations</strong>.</li>
+      <li>Click <strong>Save</strong> at the top right.</li>
     </ol>
     <div style="font-weight:400;color:var(--muted);margin-top:4px">Shoppers now see a recommendations row on every product page.</div>
   </li>
   <li><strong>Step 2 &mdash; Show recommendations in the cart</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>Still in <strong>Customize</strong>, click the <strong>App embeds</strong> icon in the left sidebar (puzzle piece).</li>
-      <li>Turn <strong>ON</strong> <strong>AI Cart Recommendations</strong>.</li>
-      <li>Click <strong>Save</strong>. It appears in the slide-out cart whenever it has items.</li>
+      <li>Still in <strong>Customize</strong>, click the <strong>App embeds</strong> icon in the left sidebar (it looks like a puzzle piece).</li>
+      <li>Find <strong>AI Cart Recommendations</strong> and switch it <strong>ON</strong>.</li>
+      <li>Click <strong>Save</strong>.</li>
     </ol>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">The recommendations appear inside the slide-out cart whenever it has items in it.</div>
   </li>
-  <li><strong>Step 3 &mdash; Add the "Selected For You" page</strong><span style="display:inline-block;background:#EEF0F4;color:#6B7280;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle">Coming soon</span>
-    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>In <strong>Customize</strong>, click <strong>Add section</strong>.</li>
-      <li>Under <strong>Apps</strong>, choose <strong>Selected For You</strong>, place it on any page, then <strong>Save</strong>.</li>
-      <li>Add that page to a menu (<strong>Online Store &rarr; Navigation</strong>) so shoppers can find it.</li>
-    </ol>
-  </li>
-  <li><strong>Step 4 &mdash; Style all the recommendations</strong>
+  <li><strong>Step 3 &mdash; Style the recommendations</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>Open the <strong>Customizer</strong> tab at the top of this app.</li>
-      <li>Under <strong>Design</strong>, pick a <strong>Font family</strong> (or leave your theme default), then set the <strong>Heading</strong>, <strong>Subtitle</strong> and <strong>Product title</strong> sizes and the <strong>Button</strong> colours. These apply to all widgets at once.</li>
-      <li>Under <strong>Excluded collections</strong>, tick anything you never want recommended (for example gift cards).</li>
+      <li>Under <strong>Design</strong>, pick a <strong>Font family</strong> (or leave it on your theme default), then set the <strong>Heading</strong>, <strong>Subtitle</strong> and <strong>Product title</strong> sizes and the <strong>Button</strong> colours. These apply to all of your recommendation widgets at once.</li>
+      <li>Under <strong>Excluded collections</strong>, tick any collections you never want recommended (for example gift cards).</li>
       <li>Click <strong>Save changes</strong>.</li>
     </ol>
   </li>
-  <li><strong>Step 5 &mdash; Set up the bundle discount</strong><span style="display:inline-block;background:#EEF0F4;color:#6B7280;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle">Coming soon</span>
-    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>In the <strong>Customizer</strong>, under <strong>Bundle discount</strong>, set the <strong>Discount %</strong> and the <strong>Minimum bundle items</strong>.</li>
-      <li>Click <strong>Save changes</strong>.</li>
-      <li>When a shopper adds that many products together from the Product Rail, those bundle items automatically get the discount at checkout &mdash; no code needed, and other cart items are not affected.</li>
-    </ol>
-  </li>
-  <li><strong>Step 6 &mdash; See how it is performing</strong>
+  <li><strong>Step 4 &mdash; See how it is performing</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>Open the <strong>Performance</strong> tab at the top of this app.</li>
       <li>Choose a time period (Last 30 days, 90 days, or 12 months).</li>
-      <li>See total revenue and items from recommendations, plus the <strong>User Flow by Component</strong> panel &mdash; Clicks &rarr; Add to cart &rarr; Purchases for each widget.</li>
+      <li>See the total revenue and items that came from recommendations, plus the <strong>User Flow by Component</strong> panel &mdash; it shows Clicks &rarr; Add to cart &rarr; Purchases for each widget, so you can see what is working best.</li>
     </ol>
   </li>
 </ol>
