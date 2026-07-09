@@ -703,7 +703,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 </div><p class="foot" id="foot"></p>
 </div>
 <div id="tab-customizer" style="display:none">
-<p class="sub">Set the design for all your recommendation widgets, and choose collections to always exclude.</p>
+<p class="sub">Style each recommendation widget and choose which collections to always exclude.</p>
 <div id="czErr"></div>
 <div class="cz-grid" id="czGrid"></div>
 <div class="cz-global">
@@ -771,25 +771,30 @@ function czField(comp,key,label,type,extra){
   return "<div class='cz-field'><label>"+label+"</label><input "+extra+" type='"+type+"' data-comp='"+comp+"' data-key='"+key+"' id='cz-"+comp+"-"+key+"'></div>";
 }
 function renderCzGrid(){
-  var fonts=["Roboto","Open Sans","Lato","Montserrat","Poppins","Inter","Oswald","Raleway","Nunito","Playfair Display","Merriweather","Rubik","Work Sans","Noto Sans","Mulish"];
-  var opts="<option value=''>Default (theme font)</option>"+fonts.map(function(f){return "<option value='"+f+"'>"+f+"</option>";}).join("");
-  var html="<div class='cz-design'><h3>Design</h3><p class='sub' style='margin:0 0 16px'>These styles apply to all three recommendation widgets: Product Rail, Cart Drawer and Selected For You.</p>"
-   +"<div class='cz-field'><label>Font family</label><select id='cz-fontFamily'>"+opts+"</select></div>"
-   +"<div class='cz-row2'><div class='cz-field'><label>Heading font size (px)</label><input id='cz-headingSize' type='number' min='10' max='60'></div><div class='cz-field'><label>Subtitle font size (px)</label><input id='cz-subtitleSize' type='number' min='8' max='40'></div></div>"
-   +"<div class='cz-row2'><div class='cz-field'><label>Product title font size (px)</label><input id='cz-titleSize' type='number' min='8' max='40'></div><div class='cz-field'></div></div>"
-   +"<div class='cz-row2'><div class='cz-field'><label>Button color</label><input id='cz-buttonColor' type='color'></div><div class='cz-field'><label>Button text color</label><input id='cz-buttonTextColor' type='color'></div></div>"
-   +"</div>";
+  var html="";
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0], label=pair[1];
+    html+="<div class='cz-card'><h3>"+label+"</h3>"+
+      czField(comp,"headingFont","Heading font","text")+
+      czField(comp,"bodyFont","Body font","text")+
+      "<div class='cz-row2'>"+czField(comp,"headingSize","Heading size (px)","number")+czField(comp,"count","Number of products","number")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"titleSize","Title size (px)","number")+czField(comp,"columns","Columns","number")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"priceSize","Price size (px)","number")+"<div></div></div>"+
+      "<div class='cz-row2'>"+czField(comp,"headingColor","Heading color","color")+czField(comp,"titleColor","Title color","color")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"priceColor","Price color","color")+czField(comp,"saleColor","Sale color","color")+"</div>"+
+      "<div class='cz-row2'>"+czField(comp,"addBg","Add-to-cart background","color")+czField(comp,"addText","Add-to-cart text","color")+"</div>"+
+      "</div>";
+  });
   document.getElementById("czGrid").innerHTML=html;
 }
 function fillCzForm(settings){
-  var d=(settings&&settings.global&&settings.global.design)||{};
-  function setv(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=="")el.value=v;}
-  setv("cz-fontFamily",d.fontFamily||"");
-  setv("cz-headingSize",d.headingSize||20);
-  setv("cz-subtitleSize",d.subtitleSize||14);
-  setv("cz-titleSize",d.titleSize||14);
-  setv("cz-buttonColor",d.buttonColor||"#0B0B0B");
-  setv("cz-buttonTextColor",d.buttonTextColor||"#FFFFFF");
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0]; var s=(settings&&settings[comp])||{};
+    Object.keys(s).forEach(function(key){
+      var el=document.getElementById("cz-"+comp+"-"+key);
+      if(el) el.value=s[key];
+    });
+  });
 }
 function renderCzCollections(collections,excluded){
   var ex=new Set(excluded||[]);
@@ -801,9 +806,18 @@ function renderCzCollections(collections,excluded){
   });
 }
 function collectCzForm(){
-  function gv(id,dv){var el=document.getElementById(id);var v=el?(""+el.value).trim():"";return v||dv;}
-  var out={global:{excludedCollections:[],design:{fontFamily:gv("cz-fontFamily",""),headingSize:parseInt(gv("cz-headingSize","20"),10)||20,subtitleSize:parseInt(gv("cz-subtitleSize","14"),10)||14,titleSize:parseInt(gv("cz-titleSize","14"),10)||14,buttonColor:gv("cz-buttonColor","#0B0B0B"),buttonTextColor:gv("cz-buttonTextColor","#FFFFFF")}}};
-  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){out.global.excludedCollections.push(chip.getAttribute("data-gid"));});
+  var out={global:{excludedCollections:[]}};
+  CZ_COMPONENTS.forEach(function(pair){
+    var comp=pair[0]; out[comp]={};
+    Array.prototype.forEach.call(document.querySelectorAll("[data-comp='"+comp+"']"),function(el){
+      var key=el.getAttribute("data-key");
+      var v=el.type==="number"?parseFloat(el.value)||0:el.value;
+      out[comp][key]=v;
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){
+    out.global.excludedCollections.push(chip.getAttribute("data-gid"));
+  });
   return out;
 }
 function loadCustomizer(){
@@ -907,7 +921,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +".tab-btn{font-family:inherit;font-weight:600;font-size:14px;color:"+MUT+";background:none;border:0;padding:12px 14px;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;}"
  +".tab-btn:hover{color:"+INK+";}.tab-btn.active{color:"+INK+";border-bottom-color:"+LIME+";}"
  +".sub{color:"+MUT+";font-size:14px;line-height:1.5;}"
- +".cz-design{background:#fff;border:1px solid #E6E7EB;border-radius:16px;padding:22px 22px 10px;box-shadow:0 1px 2px rgba(0,0,0,.04);max-width:660px}"+".cz-design h3{margin:0 0 2px;font-weight:700;font-size:18px}"+".cz-design select,.cz-design input{width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid #E6E7EB;border-radius:10px;background:#fff;color:#0B0B0B}"+".cz-design input[type=color]{height:44px;padding:5px}"
+ +"#czGrid{display:none;}"
  +".bk-cz{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:24px;align-items:start;}"
  +".bk-left{min-width:0;}"
  +".bk-seg{display:inline-flex;background:#fff;border:1px solid "+LINE+";border-radius:12px;padding:4px;gap:4px;margin-bottom:18px;flex-wrap:wrap;}"
@@ -937,59 +951,6 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
  var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='';
-(function(){
- var L="#BFFC00",INK="#0B0B0B",LINE="#E6E7EB",MUT="#6B7280";
- var s2=document.createElement('style');s2.textContent=""
-  +".bk-flow{margin-top:24px}"
-  +".bk-flow-h{font-weight:700;font-size:18px;margin:0}"
-  +".bk-flow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:14px}"
-  +".bk-fc{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:18px 18px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}"
-  +".bk-fc .cap{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;margin:0 0 16px}"
-  +".bk-fc .dot{width:13px;height:13px;border-radius:4px;background:"+L+";display:inline-block}"
-  +".bk-row{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:"+MUT+";font-weight:600}"
-  +".bk-row b{font-size:19px;color:"+INK+"}"
-  +".bk-bar{height:8px;border-radius:6px;background:#EEF0F4;margin:7px 0 5px;overflow:hidden}"
-  +".bk-bar>i{display:block;height:100%;border-radius:6px;background:"+L+"}"
-  +".bk-bar.blk>i{background:"+INK+"}"
-  +".bk-sub{font-size:12px;color:"+MUT+";margin:0 0 14px}.bk-sub b{color:"+INK+"}"
-  +".bk-foot{display:flex;justify-content:space-between;border-top:1px dashed "+LINE+";padding-top:11px;margin-top:4px;font-size:12px;color:"+MUT+"}"
-  +".bk-foot b{display:block;color:"+INK+";font-size:14px;font-weight:700}";
- document.head.appendChild(s2);
- function money(n,cur){try{return new Intl.NumberFormat(undefined,{style:'currency',currency:cur||'USD',currencyDisplay:'code',maximumFractionDigits:0}).format(n||0);}catch(e){return (cur||'')+' '+Math.round(Number(n||0));}}
- function pct(a,b){if(!b)return '0%';return Math.round((a/b)*100)+'%';}
- function W(v,mx){var p=mx>0?Math.round((v/mx)*100):0;if(v>0&&p<4)p=4;return p;}
- var COMPS=[{name:'Selected For You',stat:'sfy_page',fk:['sfy','page','sfy_page','selected-for-you','selected-for-you-page']},{name:'Product Rail (PDP)',stat:'pdp',fk:['pdp','rail','product_rail']},{name:'Cart Drawer',stat:'cart_drawer',fk:['cart','cart_drawer','cart-drawer']}];
- function fv(funnel,keys,ev){var t=0;for(var i=0;i<keys.length;i++){var b=funnel[keys[i]];if(b&&b[ev])t+=b[ev];}return t;}
- function render(funnel,stats){
-  funnel=funnel||{};stats=stats||{};
-  var rows=COMPS.map(function(c){var st=stats[c.stat]||{};return {name:c.name,clicks:fv(funnel,c.fk,'click'),atc:fv(funnel,c.fk,'add_to_cart'),pur:st.total||0,rev:st.revenue||0};});
-  var mC=Math.max.apply(null,rows.map(function(r){return r.clicks;}).concat([0]));
-  var mA=Math.max.apply(null,rows.map(function(r){return r.atc;}).concat([0]));
-  var mP=Math.max.apply(null,rows.map(function(r){return r.pur;}).concat([0]));
-  var cur=stats.currency||'USD';
-  var html=rows.map(function(r){return ""
-   +"<div class='bk-fc'><div class='cap'><span class='dot'></span>"+r.name+"</div>"
-   +"<div class='bk-row'>Clicks<b>"+r.clicks+"</b></div><div class='bk-bar'><i style='width:"+W(r.clicks,mC)+"%'></i></div><div class='bk-sub'><b>"+pct(r.atc,r.clicks)+"</b> added to cart</div>"
-   +"<div class='bk-row'>Add to cart<b>"+r.atc+"</b></div><div class='bk-bar'><i style='width:"+W(r.atc,mA)+"%'></i></div><div class='bk-sub'><b>"+pct(r.pur,r.atc)+"</b> of carts purchased</div>"
-   +"<div class='bk-row'>Purchases<b>"+r.pur+"</b></div><div class='bk-bar blk'><i style='width:"+W(r.pur,mP)+"%'></i></div>"
-   +"<div class='bk-foot'><div>Revenue<b>"+money(r.rev,cur)+"</b></div><div style='text-align:right'>Click &rarr; buy<b>"+pct(r.pur,r.clicks)+"</b></div></div>"
-   +"</div>";}).join('');
-  var g=document.getElementById('bk-flow-grid');if(g)g.innerHTML=html;
- }
- function build(){
-  var perf=document.getElementById('tab-performance');if(!perf)return;
-  if(!document.getElementById('bk-flow')){
-   var wrap=document.createElement('div');wrap.id='bk-flow';wrap.className='bk-flow';
-   wrap.innerHTML="<h3 class='bk-flow-h'>User Flow by Component</h3><p class='sub' style='margin:2px 0 0'>Clicks &rarr; Add to cart &rarr; Purchases &middot; attributed to the source component</p><div class='bk-flow-grid' id='bk-flow-grid'></div>";
-   var cards=perf.querySelector('.cards');
-   if(cards&&cards.parentNode){cards.parentNode.insertBefore(wrap,cards.nextSibling);}else{perf.appendChild(wrap);}
-  }
-  render({},{});try{Promise.all([Promise.resolve(authedFetch('/funnel')).catch(function(){return {};}),Promise.resolve(authedFetch('/stats')).catch(function(){return {};})]).then(function(a){render(a[0]||{},a[1]||{});}).catch(function(){});}catch(e){}
- }
- setTimeout(build,500);
- var dd=document.getElementById('days');if(dd)dd.addEventListener('change',function(){setTimeout(build,60);});
- var pb=document.getElementById('tabBtnPerf');if(pb)pb.addEventListener('click',function(){setTimeout(build,60);});
-})();
  function val(id,d){var e=document.getElementById(id);var v=e&&e.value!=null?(''+e.value).trim():'';return v||d;}
  function lum(hex){hex=(''+hex).replace('#','');if(hex.length===3)hex=hex.replace(/./g,'$&$&');var n=parseInt(hex,16);if(isNaN(n))return 0;return (0.299*(n>>16&255)+0.587*(n>>8&255)+0.114*(n&255))/255;}
  function wkey(card){var i=card.querySelector('input[id^="cz-"]');if(!i)return null;var m=/^cz-([a-z]+)-/.exec(i.id);return m?m[1]:null;}
