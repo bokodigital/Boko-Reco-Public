@@ -77,7 +77,7 @@ async function saveSettings(next) {
 function publicConfig(s) {
   const settings = s || defaults();
   return {
-    global: { excludedCollections: (settings.global && settings.global.excludedCollections) || [] },
+    global: { excludedCollections: (settings.global && settings.global.excludedCollections) || [], design: (settings.global && settings.global.design) || {} },
     rail: settings.rail,
     cart: settings.cart,
     sfy: settings.sfy,
