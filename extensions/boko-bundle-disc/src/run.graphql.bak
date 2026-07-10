@@ -3,7 +3,7 @@ query RunInput {
     lines {
       id
       quantity
-      bundle: attribute(key: "_boko_reco") { value }
+      bundle: attribute(key: "_boko_bundle") { value }
     }
   }
   discountNode {

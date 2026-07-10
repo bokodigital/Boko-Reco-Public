@@ -28,7 +28,7 @@ function componentDefaults() {
 
 function defaults() {
   return {
-    global: { excludedCollections: [], bundle: { enabled: false, percentage: 10, minItems: 2 } },
+    global: { excludedCollections: [] },
     rail: componentDefaults(),
     cart: componentDefaults(),
     sfy: componentDefaults(),

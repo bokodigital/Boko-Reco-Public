@@ -49,45 +49,6 @@ async function gql(shop, token, query, variables) {
   return r.json();
 }
 
-// ---- Bundle discount (Shopify Function) ----
-const BUNDLE_FN_HANDLE = "boko-bundle-disc";
-const BUNDLE_TITLE = "Boko Bundle Discount";
-const BUNDLE_META_NS = "$app:boko-bundle-disc";
-const BUNDLE_META_KEY = "function-configuration";
-async function getBundleFunctionId(shop, token) {
-  const r = await gql(shop, token, "query{shopifyFunctions(first:50){nodes{id title apiType}}}");
-  const nodes = (r && r.data && r.data.shopifyFunctions && r.data.shopifyFunctions.nodes) || [];
-  const fn = nodes.find((n) => n.title === BUNDLE_FN_HANDLE) || nodes.find((n) => n.apiType === "product_discounts");
-  return fn ? fn.id : null;
-}
-async function ensureBundleDiscount(shop, token, cfg) {
-  const pct = Math.max(1, Math.min(90, Number(cfg.percentage) || 10));
-  const minItems = Math.max(2, Number(cfg.minItems) || 2);
-  const enabled = !!cfg.enabled;
-  const value = JSON.stringify({ percentage: pct, minItems: minItems });
-  const settings = await loadSettings();
-  let gid = (settings.global && settings.global.bundle && settings.global.bundle.discountGid) || null;
-  if (gid) {
-    const chk = await gql(shop, token, "query($id:ID!){discountNode(id:$id){id}}", { id: gid });
-    if (!(chk && chk.data && chk.data.discountNode)) gid = null;
-  }
-  if (!gid) {
-    if (!enabled) return { ok: true, gid: null };
-    const fnId = await getBundleFunctionId(shop, token);
-    if (!fnId) return { ok: false, error: "bundle function not found" };
-    const cr = await gql(shop, token, "mutation C($d:DiscountAutomaticAppInput!){discountAutomaticAppCreate(automaticAppDiscount:$d){userErrors{field message}automaticAppDiscount{discountId}}}", { d: { title: BUNDLE_TITLE, functionId: fnId, startsAt: new Date().toISOString(), combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true }, metafields: [{ namespace: BUNDLE_META_NS, key: BUNDLE_META_KEY, type: "json", value: value }] } });
-    const cErr = cr && cr.data && cr.data.discountAutomaticAppCreate && cr.data.discountAutomaticAppCreate.userErrors;
-    if (cErr && cErr.length) return { ok: false, error: cErr.map((e) => e.message).join("; ") };
-    gid = cr.data.discountAutomaticAppCreate.automaticAppDiscount.discountId;
-    await saveSettings({ global: { bundle: { discountGid: gid } } });
-    return { ok: true, gid: gid, created: true };
-  }
-  await gql(shop, token, "mutation S($m:[MetafieldsSetInput!]!){metafieldsSet(metafields:$m){userErrors{field message}}}", { m: [{ ownerId: gid, namespace: BUNDLE_META_NS, key: BUNDLE_META_KEY, type: "json", value: value }] });
-  const mut = enabled ? "discountAutomaticActivate" : "discountAutomaticDeactivate";
-  await gql(shop, token, "mutation A($id:ID!){" + mut + "(id:$id){userErrors{field message}}}", { id: gid });
-  return { ok: true, gid: gid, updated: true };
-}
-
 // ---- Admin REST helper (used for theme file installs — no GraphQL Theme Asset API) ----
 async function restCall(shop, token, path, method, body) {
   const r = await fetch(`https://${shop}/admin/api/${API}/${path}`, {
@@ -520,7 +481,6 @@ app.post("/settings", express.json(), async (req, res) => {
     const shop = shopFromSessionToken(idToken);
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
     const merged = await saveSettings(req.body || {});
-      try { if (req.body && req.body.global && req.body.global.bundle) { const _st = await shopAndTokenFromRequest(req); if (_st && _st.token) { const _br = await ensureBundleDiscount(shop, _st.token, (merged.global && merged.global.bundle) || {}); if (_br && _br.error) console.error("bundle sync:", _br.error); } } } catch (e) { console.error("bundle sync failed:", e && e.message); }
     res.status(200).send(JSON.stringify({ settings: merged }));
   } catch (e) {
     res.status(200).send(JSON.stringify({ error: e.message }));
@@ -864,7 +824,7 @@ function renderCzGrid(){
    +"<div class='cz-row2'><div class='cz-field'><label>Product title font size (px)</label><input id='cz-titleSize' type='number' min='8' max='40'></div><div class='cz-field'></div></div>"
    +"<div class='cz-row2'><div class='cz-field'><label>Button color</label><input id='cz-buttonColor' type='color'></div><div class='cz-field'><label>Button text color</label><input id='cz-buttonTextColor' type='color'></div></div>"
    +"</div>";
-  html=html+"<div class='cz-design' style='margin-top:16px'><h3>Bundle discount</h3><p class='sub' style='margin:0 0 16px'>Give shoppers an automatic discount when they add two or more recommended products together. The discount applies only to those bundle items.</p><div class='cz-field'><label style='display:flex;align-items:center;gap:8px;cursor:pointer'><input id='cz-bundleEnabled' type='checkbox' style='width:auto;margin:0'>Enable bundle discount</label></div><div class='cz-row2'><div class='cz-field'><label>Discount %</label><input id='cz-bundlePct' type='number' min='1' max='90'></div><div class='cz-field'><label>Minimum bundle items</label><input id='cz-bundleMin' type='number' min='2' max='10'></div></div></div>";document.getElementById("czGrid").innerHTML=html;
+  document.getElementById("czGrid").innerHTML=html;
 }
 function fillCzForm(settings){
   var d=(settings&&settings.global&&settings.global.design)||{};
@@ -874,7 +834,7 @@ function fillCzForm(settings){
   setv("cz-subtitleSize",d.subtitleSize||14);
   setv("cz-titleSize",d.titleSize||14);
   setv("cz-buttonColor",d.buttonColor||"#0B0B0B");
-  setv("cz-buttonTextColor",d.buttonTextColor||"#FFFFFF");var b=(settings&&settings.global&&settings.global.bundle)||{};var be=document.getElementById("cz-bundleEnabled");if(be)be.checked=!!b.enabled;setv("cz-bundlePct",b.percentage||10);setv("cz-bundleMin",b.minItems||2);
+  setv("cz-buttonTextColor",d.buttonTextColor||"#FFFFFF");
 }
 function renderCzCollections(collections,excluded){
   var ex=new Set(excluded||[]);
@@ -888,7 +848,7 @@ function renderCzCollections(collections,excluded){
 function collectCzForm(){
   function gv(id,dv){var el=document.getElementById(id);var v=el?(""+el.value).trim():"";return v||dv;}
   var out={global:{excludedCollections:[],design:{fontFamily:gv("cz-fontFamily",""),headingSize:parseInt(gv("cz-headingSize","20"),10)||20,subtitleSize:parseInt(gv("cz-subtitleSize","14"),10)||14,titleSize:parseInt(gv("cz-titleSize","14"),10)||14,buttonColor:gv("cz-buttonColor","#0B0B0B"),buttonTextColor:gv("cz-buttonTextColor","#FFFFFF")}}};
-  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){out.global.excludedCollections.push(chip.getAttribute("data-gid"));});var bce=document.getElementById("cz-bundleEnabled");out.global.bundle={enabled:bce?!!bce.checked:false,percentage:parseInt(gv("cz-bundlePct","10"),10)||10,minItems:parseInt(gv("cz-bundleMin","2"),10)||2};
+  Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){out.global.excludedCollections.push(chip.getAttribute("data-gid"));});
   return out;
 }
 function loadCustomizer(){
