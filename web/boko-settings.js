@@ -77,7 +77,7 @@ async function saveSettings(next) {
 function publicConfig(s) {
   const settings = s || defaults();
   return {
-    global: { excludedCollections: (settings.global && settings.global.excludedCollections) || [], design: (settings.global && settings.global.design) || {} },
+    global: { excludedCollections: (settings.global && settings.global.excludedCollections) || [], design: (settings.global && settings.global.design) || {}, bundle: { enabled: !!(settings.global && settings.global.bundle && settings.global.bundle.enabled), percentage: (settings.global && settings.global.bundle && settings.global.bundle.percentage) || 0, minItems: (settings.global && settings.global.bundle && settings.global.bundle.minItems) || 2 } },
     rail: settings.rail,
     cart: settings.cart,
     sfy: settings.sfy,

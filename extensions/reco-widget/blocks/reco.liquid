@@ -22,7 +22,7 @@
   endif
   assign container_css = "max-width:1240px;margin:40px auto;padding:0 16px"
   if block.settings.full_width
-    assign container_css = "width:100vw;max-width:100vw;margin:40px 0;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);padding:0"
+    assign container_css = "width:calc(100vw - var(--boko-sbw,0px));max-width:calc(100vw - var(--boko-sbw,0px));margin:40px 0;margin-left:calc(50% - 50vw + var(--boko-sbw,0px) / 2);margin-right:calc(50% - 50vw + var(--boko-sbw,0px) / 2);padding:0"
   endif
   assign img_fit = "cover"
   if block.settings.image_fit == "contain"
@@ -61,7 +61,7 @@
 #boko-reco-{{ block.id }} .boko-reco__btext b{font-size:14px}#boko-reco-{{ block.id }} .boko-reco__btext span{display:block;font-size:12px;color:#bdbdbd}
 #boko-reco-{{ block.id }} .boko-reco__save{color:#7fd0a1}
 #boko-reco-{{ block.id }} .boko-reco__bspacer{flex:1}
-#boko-reco-{{ block.id }} .boko-reco__btotal{font-size:20px}#boko-reco-{{ block.id }} .boko-reco__btotal small{font-size:12px;color:#9a9a9a;text-decoration:line-through;margin-right:8px}
+#boko-reco-{{ block.id }} .boko-reco__btotal{font-size:20px;margin-left:auto}#boko-reco-{{ block.id }} .boko-reco__btotal small{font-size:12px;color:#9a9a9a;text-decoration:line-through;margin-right:8px}
 #boko-reco-{{ block.id }} .boko-reco__badd{border:none;background:#fff;color:#1f1f1f;font:inherit;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;padding:12px 22px;cursor:pointer}
 #boko-reco-{{ block.id }} .boko-reco__bclear{background:transparent;border:1px solid #444;color:#ddd;padding:11px 14px;font:inherit;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 @media(max-width:600px){#boko-reco-{{ block.id }} .boko-reco__grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
@@ -81,6 +81,7 @@
   data-bundle-min="{{ block.settings.promo_min | default: 2 }}"
   {% if template contains 'product' %}data-anchor="{{ product.id }}" data-anchor-type="{{ product.type | escape }}" data-anchor-title="{{ product.title | escape }}" data-anchor-tags="{{ product.tags | join: ',' | escape }}" data-anchor-price="{{ product.price | divided_by: 100.0 }}"{% endif %}>
   <h2 class="boko-reco__title">{{ block.settings.title }}</h2>
+  <style>.boko-reco__vp{position:relative}.boko-reco__grid--car{-ms-overflow-style:none;scrollbar-width:none}.boko-reco__grid--car::-webkit-scrollbar{display:none}.boko-reco__cnav{position:absolute;top:38%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid var(--line,#e2e2e2);background:#fff;color:var(--ink,#1f1f1f);cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;box-shadow:0 2px 10px rgba(0,0,0,.14)}.boko-reco__cprev{left:4px}.boko-reco__cnext{right:4px}.boko-reco__cnav:disabled{opacity:.3;cursor:not-allowed;box-shadow:none}</style>
   <div class="boko-reco__grid" data-reco-grid></div>
 </div>
 <script>
@@ -93,6 +94,7 @@
     var limit=parseInt(root.getAttribute("data-limit")||"8",10);
     var discount=parseFloat(root.getAttribute("data-bundle-discount")||"0");
     var promoMin=parseInt(root.getAttribute("data-bundle-min")||"2",10);
+    try{fetch(proxy.replace(/\/recommend\/?$/,"/config"),{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(cfg){var bb=cfg&&cfg.global&&cfg.global.bundle;if(!bb)return;if(bb.percentage!=null&&Number(bb.percentage)>0)discount=Number(bb.percentage);if(bb.minItems!=null&&Number(bb.minItems)>0)promoMin=Number(bb.minItems);renderBundle();}).catch(function(){});}catch(e){}
     var anchor=root.getAttribute("data-anchor")||"";
     var aType=root.getAttribute("data-anchor-type")||"";
     var aTitle=root.getAttribute("data-anchor-title")||"";
@@ -150,10 +152,33 @@
       c.querySelector("input").addEventListener("change",function(){toggleBundle(p);});
       return c;
     }
+    function setupCarousel(root,grid,perRow){
+      if(grid.getAttribute("data-car"))return;
+      grid.setAttribute("data-car","1");
+      root.classList.add("is-car");
+      grid.style.display="flex";grid.style.gridTemplateColumns="none";grid.style.overflowX="auto";grid.style.scrollSnapType="x mandatory";grid.classList.add("boko-reco__grid--car");
+      function sizeCards(){
+        var gap=parseFloat(getComputedStyle(grid).columnGap||getComputedStyle(grid).gap)||16;
+        var w=grid.clientWidth||root.clientWidth||window.innerWidth;
+        var MIN=window.innerWidth<=600?140:200;
+        var per=Math.floor((w+gap)/(MIN+gap));
+        per=Math.max(2,Math.min(perRow,per||2));
+        Array.prototype.forEach.call(grid.children,function(c){c.style.flex="0 0 calc((100% - "+((per-1)*gap)+"px) / "+per+")";c.style.scrollSnapAlign="start";});
+      }
+      sizeCards();
+      var vp=document.createElement("div");vp.className="boko-reco__vp";grid.parentNode.insertBefore(vp,grid);vp.appendChild(grid);
+      var prev=document.createElement("button");prev.type="button";prev.className="boko-reco__cnav boko-reco__cprev";prev.setAttribute("aria-label","Previous");prev.innerHTML="&#8249;";
+      var next=document.createElement("button");next.type="button";next.className="boko-reco__cnav boko-reco__cnext";next.setAttribute("aria-label","Next");next.innerHTML="&#8250;";
+      vp.appendChild(prev);vp.appendChild(next);
+      function upd(){var cs=grid.scrollWidth>grid.clientWidth+2;prev.style.display=cs?"":"none";next.style.display=cs?"":"none";if(cs){prev.disabled=grid.scrollLeft<=2;next.disabled=grid.scrollLeft>=(grid.scrollWidth-grid.clientWidth-2);}}
+      prev.addEventListener("click",function(){grid.scrollBy({left:-grid.clientWidth,behavior:"smooth"});});
+      next.addEventListener("click",function(){grid.scrollBy({left:grid.clientWidth,behavior:"smooth"});});
+      grid.addEventListener("scroll",upd);window.addEventListener("resize",function(){sizeCards();upd();});setTimeout(upd,60);
+    }
     function load(){
       grid.style.gridTemplateColumns="repeat("+perRow+",minmax(0,1fr))";
       grid.innerHTML="<div class='boko-reco__loading'>Loading…</div>";
-      getItems().then(function(items){grid.innerHTML="";if(!items.length){grid.innerHTML="<div class='boko-reco__loading'>No recommendations yet.</div>";return;}items.forEach(function(p){if(p.variantId)grid.appendChild(card(p));});});
+      getItems().then(function(items){grid.innerHTML="";if(!items.length){grid.innerHTML="<div class='boko-reco__loading'>No recommendations yet.</div>";return;}var valid=items.filter(function(p){return p.variantId;});valid.forEach(function(p){grid.appendChild(card(p));});if(valid.length>4){setupCarousel(root,grid,perRow);}});
     }
     function addToCart(variantId,btn){if(btn)btn.disabled=true;var body={items:[{id:Number(vnum(variantId)),quantity:1,properties:{"_boko_reco":"pdp"}}]};var sec=getSections();if(sec){body.sections=sec;body.sections_url=location.pathname;}fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)return r.json().then(function(e){throw e;});return r.json();}).then(function(json){if(btn){btn.textContent="Added ✓";btn.classList.add("is-added");setTimeout(function(){btn.textContent="Add to cart";btn.classList.remove("is-added");btn.disabled=false;},1600);}showCart(json);}).catch(function(e){if(btn){btn.textContent="Unavailable";setTimeout(function(){btn.textContent="Add to cart";btn.disabled=false;},1600);}console.warn("[boko] add-to-cart failed",e);});}
     function ensureBar(){if(bar)return bar;bar=el("<div class='boko-reco__bar'><div class='boko-reco__bthumbs' data-bt></div><div class='boko-reco__btext'><b data-bc>0 items</b><span data-bs></span></div><div class='boko-reco__bspacer'></div><div class='boko-reco__btotal'><small data-bcomp></small><span data-btt>$0.00</span></div><button class='boko-reco__bclear' data-bclear>Clear</button><button class='boko-reco__badd' data-badd>Add bundle to cart</button></div>");root.appendChild(bar);bar.querySelector("[data-bclear]").addEventListener("click",function(){bundle=[];ITEMS={};renderBundle();load();});bar.querySelector("[data-badd]").addEventListener("click",addBundle);return bar;}
@@ -162,6 +187,8 @@
     function addBundle(){if(!bundle.length)return;var items=bundle.map(function(v){return {id:Number(vnum(v)),quantity:1,properties:{"_boko_reco":"pdp"}};});var add=bar&&bar.querySelector("[data-badd]");if(add){add.disabled=true;add.textContent="Adding…";}function done(){if(add){add.disabled=false;add.textContent="Add bundle to cart";}bundle=[];ITEMS={};renderBundle();load();}var body={items:items};var sec=getSections();if(sec){body.sections=sec;body.sections_url=location.pathname;}fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw r;return r.json();}).then(function(json){showCart(json);reloadDrawer();done();}).catch(function(){var seq=Promise.resolve();items.forEach(function(it){seq=seq.then(function(){return fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[it]})}).then(function(){}).catch(function(){});});});seq.then(function(){reloadDrawer();}).then(done);});}
     load();
   }
+  function setSbw(){document.documentElement.style.setProperty("--boko-sbw",(window.innerWidth-document.documentElement.clientWidth)+"px");}
+  setSbw();window.addEventListener("resize",setSbw);
   document.querySelectorAll("[data-boko-reco]").forEach(init);
 })();
 </script>
