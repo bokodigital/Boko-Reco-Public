@@ -305,7 +305,7 @@ function verifyProxy(query) {
 async function loadProducts(shop, token, limit = 100, productType = "") {
   const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
   const qstr = safe ? `status:active product_type:${safe}` : "status:active";
-  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle onlineStoreUrl status publishedAt productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
+  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
   const results = [];
@@ -335,10 +335,7 @@ async function loadProducts(shop, token, limit = 100, productType = "") {
     });
     const v = n.variants && n.variants.edges[0] && n.variants.edges[0].node;
     if (!v || !v.availableForSale) continue;
-      if (!n.onlineStoreUrl) continue;
-      if (n.status && String(n.status).toUpperCase() !== "ACTIVE") continue;
-      if (n.publishedAt && new Date(n.publishedAt).getTime() > Date.now()) continue;
-    results.push({ id: n.id, handle: n.handle, variantId: v.id, available: true, _pub: n.onlineStoreUrl || null, _st: n.status || null,
+    results.push({ id: n.id, handle: n.handle, variantId: v.id, available: true,
       title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
       price: parseFloat(v.price), img: (n.featuredImage && n.featuredImage.url) || "",
       orders: Math.max(0, limit - i) * 3, views: 0, options, variants,
