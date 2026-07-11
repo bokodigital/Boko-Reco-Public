@@ -80,10 +80,11 @@
     function go(i){ if(!items.length)return; idx=(i+items.length)%items.length; slides.style.transform="translateX("+(-idx*100)+"%)"; dots.querySelectorAll(".bcc-dot").forEach(function(d,k){d.classList.toggle("on",k===idx);}); }
     function stop(){ if(timer){clearInterval(timer);timer=null;} }
     function start(){ stop(); if(autoplay>0 && items.length>1){ timer=setInterval(function(){go(idx+1);}, autoplay*1000); } }
-    function addToCart(v,btn){
+    function bokoSyncDrawer(){try{var cd=document.querySelector("cart-drawer");if(!cd||!cd.getSectionsToRender)return;var sec=cd.getSectionsToRender().map(function(s){return s.id;});fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:sec,sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{cd.renderContents(js);}catch(e){}var L=["#CartDrawer",".drawer__inner","cart-drawer-items",".cart-drawer"];for(var i=0;i<L.length;i++){var n=document.querySelector(L[i]);if(n)n.classList.remove("is-empty");}cd.classList.remove("is-empty");});}catch(e){}}
+      function addToCart(v,btn){
       fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[{id:vnum(v),quantity:1,properties:{"_boko_reco":"cart_drawer"}}]})})
         .then(function(r){if(!r.ok)throw 0;return r.json();})
-        .then(function(){ if(btn){btn.textContent="Added";btn.classList.add("added");} document.dispatchEvent(new CustomEvent("boko:cart:added")); refresh(); })
+        .then(function(){ if(btn){btn.textContent="Added";btn.classList.add("added");} bokoSyncDrawer();document.dispatchEvent(new CustomEvent("boko:cart:added")); refresh(); })
         .catch(function(){ if(btn)btn.textContent="Try again"; });
     }
     function makeSlide(p){

@@ -43,10 +43,11 @@ const STOREFRONT_JS = `(function(){
     document.dispatchEvent(new CustomEvent("boko:cart:added"));
   }
   function getSections(){var cd=document.querySelector("cart-drawer");return(cd&&cd.getSectionsToRender)?cd.getSectionsToRender().map(function(s){return s.id;}):null;}
-  function showCart(json){
+  function bokoUnempty(cd){try{if(!document.querySelector("cart-drawer .cart-item"))return;var L=["#CartDrawer",".drawer__inner","cart-drawer-items",".cart-drawer"];for(var i=0;i<L.length;i++){var n=document.querySelector(L[i]);if(n)n.classList.remove("is-empty");}cd.classList.remove("is-empty");if(typeof cd.open==="function"){cd.open();}else{cd.classList.add("active");}}catch(e){}}
+function showCart(json){
     var cd=document.querySelector("cart-drawer");
     if(cd&&typeof cd.renderContents==="function"&&json&&json.sections&&json.sections["cart-drawer"]){
-      try{cd.renderContents(json);cd.classList.remove("is-empty");var inner=document.querySelector("#CartDrawer");if(inner)inner.classList.remove("is-empty");return;}catch(e){}
+      try{cd.renderContents(json);bokoUnempty(cd);return;}catch(e){}
     }
     fetch("/cart.js",{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(c){cartNotify(c.item_count||0);}).catch(function(){cartNotify(0);});
   }
@@ -292,6 +293,7 @@ const STOREFRONT_JS = `(function(){
   }
   function cartRootHTML(){return "<div class='boko-cart' data-boko-cart><p class='boko-cart__h'>You may also like</p><div class='boko-cart__vp'><button class='boko-cart__nav boko-cart__prev' type='button' aria-label='Previous'>&#8249;</button><div class='boko-cart__track' data-row></div><button class='boko-cart__nav boko-cart__next' type='button' aria-label='Next'>&#8250;</button></div><div class='boko-cart__dots' data-dots></div></div>";}
   function injectCart(){
+    var dup=document.querySelectorAll("[data-boko-cc]");for(var q=0;q<dup.length;q++){if(dup[q].parentNode)dup[q].parentNode.removeChild(dup[q]);}
     var host=findCartHost();
     if(host){
       if(host.parentNode&&host.parentNode.querySelector("[data-boko-cart]"))return;
