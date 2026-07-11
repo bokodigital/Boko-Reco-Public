@@ -156,6 +156,7 @@ function showCart(json){
   function initRail(){
     var product=productMeta();
     if(!product||!product.id)return;
+    if(document.querySelector(".boko-reco,[data-boko-reco]")){var old=document.getElementById("boko-rail");if(old&&old.parentNode)old.parentNode.removeChild(old);return;}
     if(document.getElementById("boko-rail"))return;
     injectRailStyles();
     var host=findRailHost();
