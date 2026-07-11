@@ -156,7 +156,8 @@
     return null;
   }
   function inject(){
-    var host=findHost(); if(!host) return;
+      if(document.querySelector("[data-boko-cart]")){var mine=document.querySelectorAll("[data-boko-cc]");for(var z=0;z<mine.length;z++){if(mine[z].parentNode)mine[z].parentNode.removeChild(mine[z]);}return;}
+      var host=findHost(); if(!host) return;
     if(host.parentNode && host.parentNode.querySelector("[data-boko-cc]")) return; // already there
     var node=TPL.content.firstElementChild.cloneNode(true);
     host.parentNode.insertBefore(node, host);
@@ -165,7 +166,7 @@
   // Try now, on load, and whenever the DOM changes (cart drawer opens/re-renders).
   inject();
   document.addEventListener("DOMContentLoaded", inject);
-  var mo=new MutationObserver(function(){ inject(); });
+  var ccT=null;var mo=new MutationObserver(function(){if(ccT)return;ccT=setTimeout(function(){ccT=null;inject();},250);});
   mo.observe(document.documentElement,{childList:true,subtree:true});
 })();
 </script>

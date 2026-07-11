@@ -292,8 +292,18 @@ function showCart(json){
     }).catch(function(){track.innerHTML="<div class='boko-cart__empty'>Couldn't load.</div>";});
   }
   function cartRootHTML(){return "<div class='boko-cart' data-boko-cart><p class='boko-cart__h'>You may also like</p><div class='boko-cart__vp'><button class='boko-cart__nav boko-cart__prev' type='button' aria-label='Previous'>&#8249;</button><div class='boko-cart__track' data-row></div><button class='boko-cart__nav boko-cart__next' type='button' aria-label='Next'>&#8250;</button></div><div class='boko-cart__dots' data-dots></div></div>";}
+  var BOKO_BUSY=false;var BOKO_MO=null;
+  function bokoDedupeCC(){var d=document.querySelectorAll("[data-boko-cc]");for(var q=0;q<d.length;q++){if(d[q].parentNode)d[q].parentNode.removeChild(d[q]);}}
   function injectCart(){
-    var dup=document.querySelectorAll("[data-boko-cc]");for(var q=0;q<dup.length;q++){if(dup[q].parentNode)dup[q].parentNode.removeChild(dup[q]);}
+    if(BOKO_BUSY)return;
+    if(document.querySelector("[data-boko-cart]"))return;
+    BOKO_BUSY=true;
+    if(BOKO_MO)BOKO_MO.disconnect();
+    try{injectCartInner();}catch(e){}
+    if(BOKO_MO)BOKO_MO.observe(document.documentElement,{childList:true,subtree:true});
+    BOKO_BUSY=false;
+  }
+  function injectCartInner(){
     var host=findCartHost();
     if(host){
       if(host.parentNode&&host.parentNode.querySelector("[data-boko-cart]"))return;
@@ -314,8 +324,9 @@ function showCart(json){
   function initCart(){
     injectCart();
     document.addEventListener("DOMContentLoaded",injectCart);
-    var mo=new MutationObserver(function(){injectCart();});
-    mo.observe(document.documentElement,{childList:true,subtree:true});
+    var moT=null;
+    BOKO_MO=new MutationObserver(function(){if(BOKO_BUSY)return;if(moT)return;moT=setTimeout(function(){moT=null;injectCart();},250);});
+    BOKO_MO.observe(document.documentElement,{childList:true,subtree:true});
     ["boko:cart:added","cart:updated","cart:refresh","cart:change","ajaxCart:afterCartLoad"].forEach(function(ev){
       document.addEventListener(ev,function(){setTimeout(injectCart,300);});
     });
