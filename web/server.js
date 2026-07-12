@@ -1007,7 +1007,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +".bk-seg{display:inline-flex;background:#fff;border:1px solid "+LINE+";border-radius:12px;padding:4px;gap:4px;margin-bottom:18px;flex-wrap:wrap;}"
  +".bk-seg button{font-family:inherit;font-weight:600;font-size:13px;border:0;background:none;color:"+MUT+";padding:9px 16px;border-radius:9px;cursor:pointer;}"
  +".bk-seg button.on{background:"+INK+";color:#fff;}"
- +".bk-left .cz-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px 22px 8px;box-shadow:0 1px 2px rgba(0,0,0,.04);}"
+ +".bk-left .cz-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;box-shadow:0 1px 2px rgba(0,0,0,.04);display:flex;flex-direction:column;height:100%;box-sizing:border-box;}"
  +".bk-left .cz-card h3{display:none;}"
  +".cz-field{margin:0 0 16px;}"
  +".cz-field label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:"+MUT+";font-weight:600;margin:0 0 6px;}"
