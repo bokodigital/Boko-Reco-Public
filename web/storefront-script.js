@@ -186,7 +186,7 @@ function showCart(json){
     if(document.getElementById("boko-cart-style"))return;
     var css=".boko-cart{font-family:var(--boko-cart-bfont,inherit);margin:14px 0;border-top:1px solid #e6e6e6;padding-top:14px}"+
     ".boko-cart__h{text-align:center;font-family:var(--boko-cart-hfont,inherit);font-size:var(--boko-cart-hsize,13px);letter-spacing:1.5px;text-transform:uppercase;color:var(--boko-cart-hcolor,#1f1f1f);margin:0 0 12px}"+
-    ".boko-cart__vp{position:relative;overflow:hidden}"+
+    ".boko-cart__vp{position:relative;overflow:hidden;min-width:0;max-width:100%}cart-drawer.is-empty .drawer__inner{grid-template-columns:minmax(0,1fr) !important}.boko-cart{min-width:0;max-width:100%;width:100%;box-sizing:border-box;overflow:hidden}.boko-cart__track{min-width:0}"+
     ".boko-cart__track{display:flex;transition:transform .25s ease}"+
     ".boko-cart__slide{flex:0 0 100%;box-sizing:border-box;padding:0 30px;display:flex;gap:12px;align-items:flex-start}"+
     ".boko-cart__img{flex:0 0 84px;display:block}"+
