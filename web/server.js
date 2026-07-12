@@ -429,6 +429,15 @@ async function tokenExchange(shop, idToken) {
   } catch (e) { return null; }
 }
 
+function bokoNormTag(v) {
+  const t = String(v || "").toLowerCase();
+  if (!t) return null;
+  if (t.indexOf("cart") >= 0) return "cart_drawer";
+  if (t.indexOf("sfy") >= 0 || t.indexOf("selected") >= 0) return "sfy_page";
+  if (t.indexOf("pdp") >= 0 || t.indexOf("rail") >= 0 || t.indexOf("product") >= 0) return "pdp";
+  return null;
+}
+
 async function loadStats(shop, token, days) {
   const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
   const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity originalTotalSet{ shopMoney{ amount currencyCode } } discountAllocations{ allocatedAmountSet{ shopMoney{ amount } } } customAttributes{ key value } } } } } } } }`;
@@ -440,7 +449,7 @@ async function loadStats(shop, token, days) {
   orders.forEach((o) => (o.node.lineItems.edges || []).forEach((le) => {
     const li = le.node; let bokoReco = null, bokoSource = null;
     (li.customAttributes || []).forEach((a) => { if (a.key === "_boko_reco") bokoReco = a.value; if (a.key === "_boko_source") bokoSource = a.value; });
-    const tag = bokoReco || (bokoSource === "selected-for-you-page" ? "sfy_page" : null);
+    const tag = bokoNormTag(bokoReco || bokoSource);
     if (tag && src[tag]) {
       const gross = li.originalTotalSet && li.originalTotalSet.shopMoney ? parseFloat(li.originalTotalSet.shopMoney.amount) : 0;
       if (li.originalTotalSet && li.originalTotalSet.shopMoney && li.originalTotalSet.shopMoney.currencyCode) currency = li.originalTotalSet.shopMoney.currencyCode;
@@ -455,7 +464,7 @@ async function loadStats(shop, token, days) {
     return { total: items.reduce((x, i) => x + i.count, 0), revenue: Math.round(s.rev * 100) / 100, items };
   };
   const pdp = pack(src.pdp), cd = pack(src.cart_drawer), sfy = pack(src.sfy_page);
-  return { ordersScanned: orders.length, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
+  return { ordersLocked: !!(j.errors && JSON.stringify(j.errors).indexOf("ACCESS_DENIED") >= 0), ordersScanned: orders.length, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
 }
 
 app.get("/stats", async (req, res) => {
@@ -843,7 +852,7 @@ function load(){
     rows(document.getElementById("pdpRows"),d.pdp&&d.pdp.items);
     rows(document.getElementById("cdRows"),d.cart_drawer&&d.cart_drawer.items);
     rows(document.getElementById("sfyRows"),d.sfy_page&&d.sfy_page.items);
-    document.getElementById("meta").textContent=d.ordersScanned!=null?(d.ordersScanned+" recent orders scanned"):"";
+    var _m=document.getElementById("meta");if(d.ordersLocked){_m.innerHTML="<span style='color:#b45309;font-weight:600'>&#9888; Orders locked \u2014 approve <b>Protected customer data access</b> in your Partner Dashboard to see purchases &amp; revenue.</span>";}else{_m.textContent=d.ordersScanned!=null?(d.ordersScanned+" recent orders scanned"):"";}
     document.getElementById("foot").textContent="Counts reflect orders since "+(d.since||"")+" whose items were added via a Boko recommendation widget.";
   }).catch(function(){document.getElementById("err").innerHTML="<div class='err'>Couldn't load stats.</div>";});
 }
