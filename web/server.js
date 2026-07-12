@@ -1030,7 +1030,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +"#czSaveBtn:hover,.sf-row button:hover{filter:brightness(.93);}"
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
- var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='';
+ var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='none';
 (function(){
  var L="#BFFC00",INK="#0B0B0B",LINE="#E6E7EB",MUT="#6B7280";
  var s2=document.createElement('style');s2.textContent=""
