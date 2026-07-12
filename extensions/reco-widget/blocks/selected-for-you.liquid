@@ -325,6 +325,9 @@
   function init(root){
     if(root.dataset.sfyInit)return;root.dataset.sfyInit="1";
     var proxy=root.getAttribute("data-proxy")||"/apps/reco/recommend";
+
+      function bokoTrack(ev){try{var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/track");var b=JSON.stringify({event:ev,source:"sfy"});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([b],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:b,keepalive:true});}}catch(e){}}
+      try{root.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)return;var bt=t.closest("button");var an=t.closest("a");if(bt&&/add/i.test(bt.textContent||"")){bokoTrack("add_to_cart");}else if(an){bokoTrack("click");}},true);}catch(e){}
     var count=parseInt(root.getAttribute("data-count")||"12",10);
     var cols=parseInt(root.getAttribute("data-cols")||"4",10);
     var showAtc=root.getAttribute("data-show-atc")!=="false";

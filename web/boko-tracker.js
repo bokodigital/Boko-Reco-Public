@@ -12,7 +12,7 @@ const db = new Database();
 const KEY = "boko_track";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LEGACY_FILE = path.join(__dirname, "boko-track.json");
-const SAVE_DELAY_MS = 4000;
+const SAVE_DELAY_MS = 800;
 
 let state = { pdp: {}, cart_drawer: {}, sfy: {} };
 let loaded = false;

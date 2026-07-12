@@ -73,6 +73,9 @@
   function wire(root){
     if(!root||root.dataset.init) return; root.dataset.init="1";
     var proxy=root.getAttribute("data-proxy");
+
+      function bokoTrack(ev){try{var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/track");var b=JSON.stringify({event:ev,source:"cart_drawer"});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([b],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:b,keepalive:true});}}catch(e){}}
+      try{root.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)return;var bt=t.closest("button");var an=t.closest("a");if(bt&&/add/i.test(bt.textContent||"")){bokoTrack("add_to_cart");}else if(an){bokoTrack("click");}},true);}catch(e){}
     var count=Math.max(1,parseInt(root.getAttribute("data-count")||"6",10));
     var autoplay=parseInt(root.getAttribute("data-autoplay")||"0",10);
     var slides=root.querySelector("[data-slides]"), dots=root.querySelector("[data-dots]");
