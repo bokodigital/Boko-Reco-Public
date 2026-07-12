@@ -333,7 +333,9 @@ function showCart(json){
     });
   }
 
-  function boot(){initRail();initCart();}
+    function bokoTrackEv(ev,src){try{var b=JSON.stringify({event:ev,source:src});if(navigator.sendBeacon){navigator.sendBeacon(TRACK_URL,new Blob([b],{type:"application/json"}));}else{fetch(TRACK_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:b,keepalive:true});}}catch(e){}}
+  function bokoBindTracking(){try{document.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)return;var src=null;if(t.closest("[data-boko-cart]"))src="cart_drawer";else if(t.closest("#boko-rail"))src="pdp";if(!src)return;var bt=t.closest("button");var an=t.closest("a");if(bt&&/add/i.test(bt.textContent||"")){bokoTrackEv("add_to_cart",src);}else if(an){bokoTrackEv("click",src);}},true);}catch(e){}}
+  function boot(){bokoBindTracking();initRail();initCart();}
   if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",boot);}else{boot();}
 })();
 `;
