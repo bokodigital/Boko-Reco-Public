@@ -683,8 +683,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted
 .tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--line)}
 .tab-btn{font:inherit;font-weight:600;font-size:14px;background:none;border:none;padding:10px 4px;margin-right:18px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
 .tab-btn.active{color:var(--ink);border-bottom-color:var(--ink)}
-.cz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start;gap:16px;margin-bottom:20px}@media(max-width:960px){.cz-grid{grid-template-columns:1fr}}
-.cz-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px}
+.cz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:stretch;gap:16px;margin-bottom:20px}@media(max-width:960px){.cz-grid{grid-template-columns:1fr}}
+.cz-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column}
 .cz-card h3{margin:0 0 14px;font-size:15px;font-weight:600}
 .cz-field{margin-bottom:10px}
 .cz-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}

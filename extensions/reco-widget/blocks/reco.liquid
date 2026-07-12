@@ -23,7 +23,6 @@
     assign img_fit = "contain"
   endif
 -%}
-{%- if gfont != blank -%}<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family={{ gfont }}:wght@400;500;600;700&display=swap">{%- endif -%}
 <style>
 {%- if font_css != "inherit" -%}
 .boko-reco,.boko-reco h1,.boko-reco h2,.boko-reco h3,.boko-reco h4,.boko-reco p,.boko-reco span,.boko-reco a,.boko-reco button,.boko-reco label,.boko-reco div{font-family:{{ font_css }} !important;}
@@ -89,6 +88,8 @@
   function vnum(g){var m=String(g).match(/(\d+)$/);return m?m[1]:g;}
   function init(root){
     var proxy=root.getAttribute("data-proxy")||"/apps/reco/recommend";
+
+      try{var _gf="{{ gfont }}";if(_gf){var _id="boko-gf-"+_gf;if(!document.getElementById(_id)){var _l=document.createElement("link");_l.id=_id;_l.rel="stylesheet";_l.href="https://fonts.googleapis.com/css2?family="+_gf+":wght@400;500;600;700&display=swap";document.head.appendChild(_l);}}}catch(e){}
 
       function bokoTrack(ev){try{var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/track");var b=JSON.stringify({event:ev,source:"pdp"});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([b],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:b,keepalive:true});}}catch(e){}}
       try{root.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)return;var bt=t.closest("button");var an=t.closest("a");if(bt&&/add/i.test(bt.textContent||"")){bokoTrack("add_to_cart");}else if(an){bokoTrack("click");}},true);}catch(e){}
