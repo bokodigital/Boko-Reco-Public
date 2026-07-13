@@ -176,7 +176,7 @@
       function upd(){var cs=grid.scrollWidth>grid.clientWidth+2;prev.style.display=cs?"":"none";next.style.display=cs?"":"none";if(cs){prev.disabled=grid.scrollLeft<=2;next.disabled=grid.scrollLeft>=(grid.scrollWidth-grid.clientWidth-2);}}
       prev.addEventListener("click",function(){grid.scrollBy({left:-grid.clientWidth,behavior:"smooth"});});
       next.addEventListener("click",function(){grid.scrollBy({left:grid.clientWidth,behavior:"smooth"});});
-      grid.addEventListener("scroll",upd);window.addEventListener("resize",function(){sizeCards();upd();});setTimeout(upd,60);
+      grid.addEventListener("scroll",upd);window.addEventListener("resize",function(){sizeCards();upd();});setTimeout(upd,60);try{var _bmo=new MutationObserver(function(){sizeCards();upd();});_bmo.observe(grid,{childList:true});}catch(e){}
     }
     function bokoVerify(items){try{return Promise.all(items.map(function(p){if(!p.handle)return Promise.resolve(null);return fetch("/products/"+p.handle+".js",{headers:{Accept:"application/json"}}).then(function(r){return r.ok?p:null;}).catch(function(){return null;});})).then(function(a){return a.filter(Boolean);});}catch(e){return Promise.resolve(items);}}
     function load(){

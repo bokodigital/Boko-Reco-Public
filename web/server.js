@@ -725,15 +725,15 @@ input:disabled+.slider{opacity:.5;cursor:default}
 </div>
 <div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
-<details class="how-to">
-<summary>How to use <span class="chev">&#9658;</span></summary>
+<details class="how-to" open>
+<summary>Installation guide <span class="chev">&#9658;</span></summary>
 <div class="how-to__body">
 <ol class="how-to__list">
-  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It automatically shows each shopper products they are likely to want &mdash; a "You may also like" row on product pages, a strip inside the cart, and a personalised "Selected For You" page &mdash; to help you sell more. You can reopen this app any time from <strong>Apps &rarr; AI Recommendations</strong> in your Shopify admin.</div></li>
+  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It shows shoppers products they are likely to want &mdash; a "You may also like" row on product pages, a carousel inside the cart, and a "Selected For You" page. Follow the steps below to switch each one on. You can reopen this guide any time from <strong>Apps &rarr; AI Recommendations</strong>.</div></li>
   <li><strong>Step 1 &mdash; Show recommendations on product pages</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>In your Shopify admin, open <strong>Online Store &rarr; Themes</strong>.</li>
-      <li>On your live theme, click the <strong>Customize</strong> button.</li>
+      <li>On your live theme, click <strong>Customize</strong>.</li>
       <li>At the top of the editor, click the page name and choose a <strong>Product</strong> page.</li>
       <li>In the left sidebar, click <strong>Add block</strong> where you want the recommendations.</li>
       <li>Under <strong>Apps</strong>, choose <strong>AI Recommendations</strong>.</li>
@@ -743,42 +743,37 @@ input:disabled+.slider{opacity:.5;cursor:default}
   </li>
   <li><strong>Step 2 &mdash; Show recommendations in the cart</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>Still in <strong>Customize</strong>, click the <strong>App embeds</strong> icon in the left sidebar (puzzle piece).</li>
-      <li>Turn <strong>ON</strong> <strong>AI Cart Recommendations</strong>.</li>
-      <li>Click <strong>Save</strong>. It appears in the slide-out cart whenever it has items.</li>
+      <li>In the theme editor, click the <strong>App embeds</strong> icon in the far-left toolbar.</li>
+      <li>Turn on <strong>Cart recommendations</strong>.</li>
+      <li>Click <strong>Save</strong>.</li>
+    </ol>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">A recommendations carousel now appears inside the cart drawer.</div>
+  </li>
+  <li><strong>Step 3 &mdash; Create the "Selected For You" page</strong>
+    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
+      <li>Go to <strong>Online Store &rarr; Pages</strong> and click <strong>Add page</strong>.</li>
+      <li>Title it <strong>Selected For You</strong>, leave the content empty, and click <strong>Save</strong>.</li>
+      <li>Open <strong>Online Store &rarr; Themes &rarr; Customize</strong>.</li>
+      <li>At the top of the editor, click the page name and choose <strong>Pages &rarr; Selected For You</strong>.</li>
+      <li>In the left sidebar click <strong>Add section</strong>, and under <strong>Apps</strong> choose <strong>Selected For You</strong>.</li>
+      <li>Click <strong>Save</strong>.</li>
     </ol>
   </li>
-  <li><strong>Step 3 &mdash; Add the "Selected For You" page</strong><span style="display:inline-block;background:#EEF0F4;color:#6B7280;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle">Coming soon</span>
+  <li><strong>Step 4 &mdash; Add the page to your menu</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>In <strong>Customize</strong>, click <strong>Add section</strong>.</li>
-      <li>Under <strong>Apps</strong>, choose <strong>Selected For You</strong>, place it on any page, then <strong>Save</strong>.</li>
-      <li>Add that page to a menu (<strong>Online Store &rarr; Navigation</strong>) so shoppers can find it.</li>
+      <li>Go to <strong>Online Store &rarr; Navigation</strong>.</li>
+      <li>Click the menu you want it in (usually <strong>Main menu</strong>).</li>
+      <li>Click <strong>Add menu item</strong>.</li>
+      <li>For <strong>Name</strong>, enter <strong>Selected For You</strong>.</li>
+      <li>Click the <strong>Link</strong> field, choose <strong>Pages</strong>, and select your <strong>Selected For You</strong> page.</li>
+      <li>Click <strong>Add</strong>, then <strong>Save menu</strong>.</li>
     </ol>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">The page is now live in your store navigation for shoppers to browse.</div>
   </li>
-  <li><strong>Step 4 &mdash; Style all the recommendations</strong>
-    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>Open the <strong>Customizer</strong> tab at the top of this app.</li>
-      <li>Under <strong>Design</strong>, pick a <strong>Font family</strong> (or leave your theme default), then set the <strong>Heading</strong>, <strong>Subtitle</strong> and <strong>Product title</strong> sizes and the <strong>Button</strong> colours. These apply to all widgets at once.</li>
-      <li>Under <strong>Excluded collections</strong>, tick anything you never want recommended (for example gift cards).</li>
-      <li>Click <strong>Save changes</strong>.</li>
-    </ol>
-  </li>
-  <li><strong>Step 5 &mdash; Set up the bundle discount</strong><span style="display:inline-block;background:#EEF0F4;color:#6B7280;font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle">Coming soon</span>
-    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>In the <strong>Customizer</strong>, under <strong>Bundle discount</strong>, set the <strong>Discount %</strong> and the <strong>Minimum bundle items</strong>.</li>
-      <li>Click <strong>Save changes</strong>.</li>
-      <li>When a shopper adds that many products together from the Product Rail, those bundle items automatically get the discount at checkout &mdash; no code needed, and other cart items are not affected.</li>
-    </ol>
-  </li>
-  <li><strong>Step 6 &mdash; See how it is performing</strong>
-    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
-      <li>Open the <strong>Performance</strong> tab at the top of this app.</li>
-      <li>Choose a time period (Last 30 days, 90 days, or 12 months).</li>
-      <li>See total revenue and items from recommendations, plus the <strong>User Flow by Component</strong> panel &mdash; Clicks &rarr; Add to cart &rarr; Purchases for each widget.</li>
-    </ol>
+  <li><strong>Step 5 &mdash; Style all the recommendations</strong>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">Open the <strong>Customizer</strong> tab above to set fonts, sizes and the bundle discount. These apply to all three widgets at once.</div>
   </li>
 </ol>
-<p class="how-to__help">Need help? Contact <a href="mailto:admin@boko.com.au">admin@boko.com.au</a>.</p>
 </div>
 </details>
 <div class="row"><label class="sub" style="margin:0">Period</label>
@@ -811,7 +806,10 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <p class="sub">Install widgets directly on your storefront — no app-embed or theme editor step required.</p>
 <div class="sf-card">
   <h3>Selected For You section</h3>
-        <p class="sub" style="margin:0 0 14px">Add a personalised recommendations section anywhere in your theme &mdash; no code needed. In Shopify: Online Store &rarr; Themes &rarr; Customize &rarr; Add section &rarr; Apps &rarr; 'Selected For You' &rarr; place it on any page &rarr; Save.</p>
+        <p class="sub" style="margin:0 0 10px">A dedicated recommendations page for your shoppers &mdash; no code needed. Set it up in three parts:</p>
+        <p class="sub" style="margin:0 0 6px"><strong>1. Create the page.</strong> Online Store &rarr; Pages &rarr; Add page. Title it <strong>Selected For You</strong>, leave the content blank, then Save.</p>
+        <p class="sub" style="margin:0 0 6px"><strong>2. Add the section.</strong> Online Store &rarr; Themes &rarr; Customize. At the top of the editor pick <strong>Pages &rarr; Selected For You</strong>, click <strong>Add section</strong>, choose <strong>Apps &rarr; Selected For You</strong>, then Save.</p>
+        <p class="sub" style="margin:0 0 14px"><strong>3. Add it to your menu.</strong> Online Store &rarr; Navigation &rarr; open your <strong>Main menu</strong> &rarr; <strong>Add menu item</strong>. Name it <strong>Selected For You</strong>, set the Link to <strong>Pages &rarr; Selected For You</strong>, click Add, then <strong>Save menu</strong>. Shoppers can now find the page from your store navigation.</p>
         <div style="display:none"><span id="sfThemeName"></span><span id="sfThemeStatus"></span><button id="sfInstallBtn" type="button"></button><div class="sf-msg" id="sfThemeMsg"></div></div>
 </div>
 <div class="sf-card">
