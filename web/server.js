@@ -1207,7 +1207,7 @@ app.get("/", async (req, res) => {
   const shop = req.query.shop;
   if (validShop(shop)) {
     const token = await getToken(shop);
-    return res.redirect(token ? ("/dashboard?shop=" + shop) : ("/auth?shop=" + shop));
+    return res.redirect(token ? ("/dashboard?shop=" + shop) : ("/dashboard?shop=" + shop));
   }
   res.send("Boko AI Recommendations (multi-tenant) is running.");
 });
