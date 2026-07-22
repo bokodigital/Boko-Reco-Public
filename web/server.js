@@ -395,8 +395,9 @@ app.get("/proxy/config", async (req, res) => {
 app.post("/proxy/track", express.json({ type: () => true }), async (req, res) => {
   try {
     if (!verifyProxy(req.query)) return res.status(401).end();
+    const shop = req.query.shop;
     const b = req.body || {};
-    await track(b.event, b.source);
+    if (validShop(shop)) await track(shop, b.event, b.source);
   } catch (e) {}
   res.status(204).end();
 });
@@ -440,10 +441,32 @@ function bokoNormTag(v) {
 
 async function loadStats(shop, token, days) {
   const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
-  const query = `query($n:Int!,$q:String){ orders(first:$n, reverse:true, query:$q){ edges{ node{ lineItems(first:50){ edges{ node{ title quantity originalTotalSet{ shopMoney{ amount currencyCode } } discountAllocations{ allocatedAmountSet{ shopMoney{ amount } } } customAttributes{ key value } } } } } } } }`;
-  const j = await gql(shop, token, query, { n: 100, q: "created_at:>=" + since });
-  if (j.errors) { const __es = JSON.stringify(j.errors); const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0; return { error: __locked ? "orders_locked" : __es, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }; }
-  const orders = (j.data && j.data.orders && j.data.orders.edges) || [];
+  // Paginate through ALL orders created in the selected timeframe (not just the
+  // first page). Shopify caps `first` at 250 for orders; we follow the cursor
+  // until hasNextPage is false. MAX_PAGES is a runaway guard, not a business cap.
+  const query = `query($n:Int!,$q:String,$cursor:String){ orders(first:$n, after:$cursor, reverse:true, query:$q){ pageInfo{ hasNextPage } edges{ cursor node{ lineItems(first:50){ edges{ node{ title quantity originalTotalSet{ shopMoney{ amount currencyCode } } discountAllocations{ allocatedAmountSet{ shopMoney{ amount } } } customAttributes{ key value } } } } } } } }`;
+  const MAX_PAGES = 100; // safety cap: up to 100 x 250 = 25,000 orders per timeframe
+  let orders = [];
+  let cursor = null, hasNext = true, pages = 0, truncated = false;
+  while (hasNext) {
+    if (pages >= MAX_PAGES) { truncated = true; break; }
+    const j = await gql(shop, token, query, { n: 250, q: "created_at:>=" + since, cursor });
+    if (j.errors) {
+      const __es = JSON.stringify(j.errors);
+      const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0;
+      // Access errors on the FIRST page => orders locked. A mid-pagination error
+      // (e.g. GraphQL throttling) => stop and report on what we've already gathered.
+      if (pages === 0) return { error: __locked ? "orders_locked" : __es, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } };
+      truncated = true; break;
+    }
+    const conn = (j.data && j.data.orders) || {};
+    const edges = conn.edges || [];
+    orders = orders.concat(edges);
+    hasNext = !!(conn.pageInfo && conn.pageInfo.hasNextPage);
+    cursor = edges.length ? edges[edges.length - 1].cursor : null;
+    if (!cursor) break;
+    pages++;
+  }
   const src = { pdp: { items: {}, rev: 0 }, cart_drawer: { items: {}, rev: 0 }, sfy_page: { items: {}, rev: 0 } };
   let currency = "";
   orders.forEach((o) => (o.node.lineItems.edges || []).forEach((le) => {
@@ -464,7 +487,7 @@ async function loadStats(shop, token, days) {
     return { total: items.reduce((x, i) => x + i.count, 0), revenue: Math.round(s.rev * 100) / 100, items };
   };
   const pdp = pack(src.pdp), cd = pack(src.cart_drawer), sfy = pack(src.sfy_page);
-  return { ordersLocked: !!(j.errors && JSON.stringify(j.errors).indexOf("ACCESS_DENIED") >= 0), ordersScanned: orders.length, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
+  return { ordersLocked: false, ordersScanned: orders.length, truncated, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
 }
 
 app.get("/stats", async (req, res) => {
@@ -491,7 +514,7 @@ app.get("/funnel", async (req, res) => {
     const shop = shopFromSessionToken(idToken);
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
     const days = Math.min(parseInt(req.query.days || "30", 10), 365);
-    res.status(200).send(JSON.stringify(await funnelCounts(days)));
+    res.status(200).send(JSON.stringify(await funnelCounts(shop, days)));
   } catch (e) {
     res.status(200).send(JSON.stringify({ error: e.message }));
   }
