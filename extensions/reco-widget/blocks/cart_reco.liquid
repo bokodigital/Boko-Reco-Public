@@ -55,11 +55,18 @@
   var TPL = document.getElementById("boko-cc-tpl");
   // Where to drop the widget inside the cart drawer/page, in priority order.
   var HOSTS = [
+    "cart-drawer-component .cart-drawer__summary", "#cart-drawer .cart-drawer__summary", ".cart-drawer__summary",
     "cart-drawer .drawer__footer", "cart-drawer .cart-drawer__footer",
     "#CartDrawer .drawer__footer", ".cart-drawer .drawer__footer",
     ".drawer__footer", ".cart-drawer__footer",
     "#cart-notification .cart-notification__links",
-    "cart-items + *", ".cart__footer", "#main-cart-footer .cart__footer"
+    "cart-items + *", ".cart__footer", "#main-cart-footer .cart__footer",
+    /* boko-extra-hosts: last-resort only. Dawn + Horizon match ABOVE and never reach these. */
+    ".cart-drawer__footer", ".mini-cart__footer", ".minicart__footer", ".slide-cart__footer",
+    ".cart-flyout__footer", ".ajaxcart__footer", ".site-header-cart__footer", ".drawer-footer",
+    ".js-cart-drawer-footer", ".cart-sidebar__footer", ".cart-panel__footer", ".cart-drawer-footer",
+    "[id*=CartDrawer] [class*=footer]", "[class*=cart-drawer] [class*=footer]",
+    "[class*=cart-drawer] [class*=summary]", "[class*=mini-cart] [class*=footer]"
   ];
 
   function money(n){return "$"+Number(n).toFixed(2);}
@@ -83,7 +90,8 @@
     function go(i){ if(!items.length)return; idx=(i+items.length)%items.length; slides.style.transform="translateX("+(-idx*100)+"%)"; dots.querySelectorAll(".bcc-dot").forEach(function(d,k){d.classList.toggle("on",k===idx);}); }
     function stop(){ if(timer){clearInterval(timer);timer=null;} }
     function start(){ stop(); if(autoplay>0 && items.length>1){ timer=setInterval(function(){go(idx+1);}, autoplay*1000); } }
-    function bokoSyncDrawer(){try{var cd=document.querySelector("cart-drawer");if(!cd||!cd.getSectionsToRender)return;var sec=cd.getSectionsToRender().map(function(s){return s.id;});fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:sec,sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{cd.renderContents(js);}catch(e){}var L=["#CartDrawer",".drawer__inner","cart-drawer-items",".cart-drawer"];for(var i=0;i<L.length;i++){var n=document.querySelector(L[i]);if(n)n.classList.remove("is-empty");}cd.classList.remove("is-empty");});}catch(e){}}
+    function bokoGenericSync(){try{var sec=document.querySelector("[id^=shopify-section-][id*=cart-drawer]");if(sec){var sid=sec.id.replace(/^shopify-section-/,"");fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:[sid],sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{var h=js&&js.sections&&js.sections[sid];if(!h)return;var t=document.createElement("div");t.innerHTML=h;var fresh=t.querySelector("#"+sec.id)||t.firstElementChild;if(fresh)sec.innerHTML=fresh.innerHTML;}catch(e){}}).catch(function(){});}}catch(e){}try{document.dispatchEvent(new CustomEvent("cart:update",{bubbles:true,detail:{source:"boko"}}));}catch(e){}}
+      function bokoSyncDrawer(){try{var cd=document.querySelector("cart-drawer");if(!cd||!cd.getSectionsToRender){bokoGenericSync();return;}var sec=cd.getSectionsToRender().map(function(s){return s.id;});fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:sec,sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{cd.renderContents(js);}catch(e){}var L=["#CartDrawer",".drawer__inner","cart-drawer-items",".cart-drawer"];for(var i=0;i<L.length;i++){var n=document.querySelector(L[i]);if(n)n.classList.remove("is-empty");}cd.classList.remove("is-empty");});}catch(e){}}
       function addToCart(v,btn){
       fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[{id:vnum(v),quantity:1,properties:{"_boko_reco":"cart_drawer"}}]})})
         .then(function(r){if(!r.ok)throw 0;return r.json();})
