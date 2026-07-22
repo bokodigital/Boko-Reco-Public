@@ -1,6 +1,6 @@
 {% comment %}
   Boko AI Recommendations — single "Recommended" rail (app/LLM-powered).
-  Calls your hosted app at block.settings.proxy_url (e.g. https://<repl>.replit.dev/recommend).
+  Calls the app through the Shopify App Proxy at /apps/reco/recommend.
   Design (font family / size / heading size / use-theme-fonts) is set in the theme editor.
   Install: Edit code → Sections → Add a new section "boko-recommendations" → paste → Save
            → Customize → Add section → "AI Recommendations".
@@ -72,7 +72,7 @@
 #boko-reco-{{ block.id }} .boko-reco__sw.is-oos{opacity:.4;text-decoration:line-through;cursor:not-allowed}
 </style>
 <div id="boko-reco-{{ block.id }}" class="boko-reco" data-boko-reco
-  data-proxy="{{ block.settings.proxy_url }}"
+  data-proxy="/apps/reco/recommend"
   data-per-row="{{ block.settings.per_row }}"
   data-limit="{{ block.settings.limit }}"
   data-bundle-discount="0"
@@ -227,13 +227,7 @@
       "step": 1,
       "default": 8
     },
-    {
-      "type": "text",
-      "id": "proxy_url",
-      "label": "App endpoint URL",
-      "default": "/apps/reco/recommend",
-      "info": "Leave as-is unless you changed the App Proxy subpath."
-    },
+    
     {
       "type": "header",
       "content": "Design"

@@ -744,15 +744,33 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div class="tabs">
   <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
   <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
+  <button class="tab-btn" id="tabBtnInstall" type="button">Installation guide</button>
   <button class="tab-btn" id="tabBtnSf" type="button" style="display:none">Storefront setup</button>
 </div>
 <div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
+
+<div class="row"><label class="sub" style="margin:0">Period</label>
+<select id="days"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option></select>
+<span id="meta" class="sub" style="margin:0 0 0 auto"></span></div>
+<div id="err"></div>
+<div class="hero"><div><div class="v lime" id="revTotal">–</div><div class="x">total revenue from recommendations</div></div>
+<div style="margin-left:auto"><div class="v" id="itemTotal">–</div><div class="x">items purchased</div></div></div>
+<div class="cards">
+  <div class="card"><span class="pill">Product page rail</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
+    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="pdpRows"></tbody></table></div>
+  <div class="card"><span class="pill">Cart drawer carousel</span><div class="big" id="cdTotal">–</div><div class="rev" id="cdRev"></div>
+    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
+  <div class="card"><span class="pill">Selected For You collection</span><div class="big" id="sfyTotal">–</div><div class="rev" id="sfyRev"></div>
+    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="sfyRows"></tbody></table></div>
+</div><p class="foot" id="foot"></p>
+</div>
+<div id="tab-installation" style="display:none">
 <details class="how-to" open>
 <summary>Installation guide <span class="chev">&#9658;</span></summary>
 <div class="how-to__body">
 <ol class="how-to__list">
-  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It shows shoppers products they are likely to want &mdash; a "You may also like" row on product pages, a carousel inside the cart, and a "Selected For You" page. Follow the steps below to switch each one on. You can reopen this guide any time from <strong>Apps &rarr; AI Recommendations</strong>.</div></li>
+  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It shows shoppers products they are likely to want &mdash; a "You may also like" or "Complete the look row" on product pages, a carousel inside the cart, and a "Selected For You" page. Follow the steps below to switch each one on. You can reopen this guide any time from <strong>Apps &rarr; AI Recommendations</strong>.</div></li>
   <li><strong>Step 1 &mdash; Show recommendations on product pages</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>In your Shopify admin, open <strong>Online Store &rarr; Themes</strong>.</li>
@@ -799,20 +817,6 @@ input:disabled+.slider{opacity:.5;cursor:default}
 </ol>
 </div>
 </details>
-<div class="row"><label class="sub" style="margin:0">Period</label>
-<select id="days"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option></select>
-<span id="meta" class="sub" style="margin:0 0 0 auto"></span></div>
-<div id="err"></div>
-<div class="hero"><div><div class="v lime" id="revTotal">–</div><div class="x">total revenue from recommendations</div></div>
-<div style="margin-left:auto"><div class="v" id="itemTotal">–</div><div class="x">items purchased</div></div></div>
-<div class="cards">
-  <div class="card"><span class="pill">Product page rail</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
-    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="pdpRows"></tbody></table></div>
-  <div class="card"><span class="pill">Cart drawer carousel</span><div class="big" id="cdTotal">–</div><div class="rev" id="cdRev"></div>
-    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
-  <div class="card"><span class="pill">Selected For You collection</span><div class="big" id="sfyTotal">–</div><div class="rev" id="sfyRev"></div>
-    <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="sfyRows"></tbody></table></div>
-</div><p class="foot" id="foot"></p>
 </div>
 <div id="tab-customizer" style="display:none">
 <p class="sub">Set the design for all your recommendation widgets, and choose collections to always exclude.</p>
@@ -999,15 +1003,18 @@ document.getElementById("sfWidgetToggle").addEventListener("change",function(){
 function showTab(name){
   document.getElementById("tab-performance").style.display=(name==="perf")?"":"none";
   document.getElementById("tab-customizer").style.display=(name==="cz")?"":"none";
+  document.getElementById("tab-installation").style.display=(name==="install")?"":"none";
   document.getElementById("tab-storefront").style.display=(name==="sf")?"":"none";
   document.getElementById("tabBtnPerf").classList.toggle("active",name==="perf");
   document.getElementById("tabBtnCz").classList.toggle("active",name==="cz");
+  document.getElementById("tabBtnInstall").classList.toggle("active",name==="install");
   document.getElementById("tabBtnSf").classList.toggle("active",name==="sf");
   if(name==="cz") loadCustomizer();
   if(name==="sf") loadStorefront();
 }
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
+ document.getElementById("tabBtnInstall").addEventListener("click",function(){showTab("install");});
 document.getElementById("tabBtnSf").addEventListener("click",function(){showTab("sf");});
 
 /* Boko dashboard enhancer v2 — on-brand two-pane customizer. Purely additive. */

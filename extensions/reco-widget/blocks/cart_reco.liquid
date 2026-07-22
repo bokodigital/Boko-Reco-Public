@@ -36,7 +36,7 @@
 
 <template id="boko-cc-tpl">
   <div class="boko-cc" data-boko-cc
-       data-proxy="{{ block.settings.proxy_url }}"
+       data-proxy="/apps/reco/recommend"
        data-count="{{ block.settings.count }}"
        data-autoplay="{{ block.settings.autoplay }}">
     <p class="bcc-h">{{ block.settings.title | escape }}</p>
@@ -238,13 +238,7 @@
       "step": 1,
       "default": 13
     },
-    {
-      "type": "text",
-      "id": "proxy_url",
-      "label": "App proxy path",
-      "default": "/apps/reco/recommend",
-      "info": "Leave as-is unless you changed the App Proxy subpath."
-    },
+    
     {
       "type": "header",
       "content": "Advanced"
