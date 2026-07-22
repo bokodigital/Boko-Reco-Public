@@ -1,24 +1,30 @@
-// boko-tracker.js — persistent funnel counters backed by Replit DB.
+// boko-tracker.js — durable, PER-SHOP funnel counters backed by Replit DB.
+//
 // Tracks lightweight events (impression / click / add_to_cart / ...) per source
-// bucket (pdp | cart_drawer | sfy) per day, so the dashboard can show a funnel
-// over any date range without re-scanning orders.
+// bucket (pdp | cart_drawer | sfy) per day, PER SHOP, so the dashboard can show a
+// funnel over any date range without re-scanning orders.
+//
+// Durability / multi-tenant design:
+//   - Every shop's data is namespaced:  trk:<shop>:<YYYY-MM-DD> -> { bucket:{ event:count } }
+//     One store's events never touch another's (fixes the old single global key).
+//   - Writes are committed to Replit DB IMMEDIATELY on every event — there is no
+//     in-memory buffer or debounce, so a republish / redeploy / abrupt Autoscale
+//     shutdown cannot lose buffered counts. Replit DB persists across deploys.
+//   - Each write only reads+writes ONE small per-shop-per-day object, so concurrent
+//     Autoscale instances can at most race on the same shop's same-day counter
+//     (a rare, self-limited loss of a single increment) instead of clobbering the
+//     entire global dataset the way the previous whole-object overwrite did.
+//
+// NOTE: Replit DB has no atomic increment, so a tiny read-modify-write race remains
+// for very high-frequency events on the same shop+day. If you later need exact
+// counts under heavy concurrency, move these counters to a store with atomic
+// increments (e.g. Postgres `UPDATE ... SET n = n + 1`). The key scheme below maps
+// cleanly onto such a table (shop, day, bucket, event, count).
 
 import Database from "@replit/database";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 
 const db = new Database();
-const KEY = "boko_track";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LEGACY_FILE = path.join(__dirname, "boko-track.json");
-const SAVE_DELAY_MS = 800;
-
-let state = { pdp: {}, cart_drawer: {}, sfy: {} };
-let loaded = false;
-let loadingPromise = null;
-let dirty = false;
-let saveTimer = null;
+const PREFIX = "trk:";
 
 function unwrap(r) {
   if (r && typeof r === "object" && "ok" in r) return r.ok ? r.value : null;
@@ -33,85 +39,70 @@ function normSource(source) {
   return "pdp";
 }
 
-async function loadState() {
-  if (loaded) return;
-  if (loadingPromise) return loadingPromise;
-  loadingPromise = (async () => {
-    let fromDb = null;
-    try { fromDb = unwrap(await db.get(KEY)); } catch (e) {}
-    if (fromDb && typeof fromDb === "object" && Object.keys(fromDb).length) {
-      state = fromDb;
-    } else {
-      try {
-        if (fs.existsSync(LEGACY_FILE)) {
-          const raw = fs.readFileSync(LEGACY_FILE, "utf8");
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === "object") { state = parsed; dirty = true; }
-        }
-      } catch (e) {}
-    }
-    if (!state.pdp) state.pdp = {};
-    if (!state.cart_drawer) state.cart_drawer = {};
-    if (!state.sfy) state.sfy = {};
-    loaded = true;
-  })();
-  return loadingPromise;
-}
-
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function scheduleSave() {
-  if (saveTimer) return;
-  saveTimer = setTimeout(async () => {
-    saveTimer = null;
-    await flush();
-  }, SAVE_DELAY_MS);
-  if (typeof saveTimer.unref === "function") saveTimer.unref();
+function dayKey(shop, day) {
+  return PREFIX + shop + ":" + day;
 }
 
-async function flush() {
-  if (!dirty) return;
-  dirty = false;
-  try { await db.set(KEY, state); } catch (e) {}
+// List all storage keys for a shop. Handles both @replit/database return styles
+// (plain array of keys, or the { ok, value } wrapper).
+async function listShopKeys(shop) {
+  try {
+    const r = await db.list(PREFIX + shop + ":");
+    const v = unwrap(r);
+    if (Array.isArray(v)) return v;
+    if (Array.isArray(r)) return r;
+    return [];
+  } catch (e) {
+    return [];
+  }
 }
 
-async function track(event, source) {
-  await loadState();
+// Record one event for a shop. Commits to the DB immediately (no buffering).
+async function track(shop, event, source) {
+  if (!shop) return;
   const bucket = normSource(source);
   const day = todayKey();
-  const ev = String(event || "unknown").slice(0, 40);
-  if (!state[bucket]) state[bucket] = {};
-  if (!state[bucket][day]) state[bucket][day] = {};
-  state[bucket][day][ev] = (state[bucket][day][ev] || 0) + 1;
-  dirty = true;
-  scheduleSave();
+  const ev = String(event || "unknown").toLowerCase().slice(0, 40);
+  const key = dayKey(shop, day);
+  try {
+    let obj = unwrap(await db.get(key));
+    if (!obj || typeof obj !== "object") obj = {};
+    if (!obj[bucket] || typeof obj[bucket] !== "object") obj[bucket] = {};
+    obj[bucket][ev] = (obj[bucket][ev] || 0) + 1;
+    await db.set(key, obj);
+  } catch (e) {
+    // Never let tracking break the request that triggered it.
+  }
 }
 
-async function funnelCounts(days = 30) {
-  await loadState();
+// Aggregate a shop's events over the last `days` days into { bucket: { event: count } }.
+async function funnelCounts(shop, days = 30) {
+  const out = { pdp: {}, cart_drawer: {}, sfy: {} };
+  if (!shop) return out;
+  const prefix = PREFIX + shop + ":";
   const since = new Date(Date.now() - Math.max(1, days) * 864e5).toISOString().slice(0, 10);
-  const out = {};
-  for (const bucket of Object.keys(state)) {
-    const totals = {};
-    const byDay = state[bucket] || {};
-    for (const day of Object.keys(byDay)) {
-      if (day < since) continue;
-      const dayData = byDay[day] || {};
-      for (const ev of Object.keys(dayData)) {
-        totals[ev] = (totals[ev] || 0) + dayData[ev];
+  const keys = (await listShopKeys(shop)).filter((k) => {
+    const day = String(k).slice(prefix.length);
+    return day && day >= since; // YYYY-MM-DD strings sort chronologically
+  });
+  await Promise.all(keys.map(async (k) => {
+    try {
+      const obj = unwrap(await db.get(k));
+      if (!obj || typeof obj !== "object") return;
+      for (const bucket of Object.keys(obj)) {
+        if (!out[bucket]) out[bucket] = {};
+        const evs = obj[bucket] || {};
+        for (const ev of Object.keys(evs)) {
+          out[bucket][ev] = (out[bucket][ev] || 0) + (Number(evs[ev]) || 0);
+        }
       }
-    }
-    out[bucket] = totals;
-  }
+    } catch (e) {}
+  }));
   return out;
 }
-
-async function shutdownFlush() {
-  try { await flush(); } catch (e) {}
-}
-process.on("SIGTERM", async () => { await shutdownFlush(); process.exit(0); });
-process.on("SIGINT", async () => { await shutdownFlush(); process.exit(0); });
 
 export { track, funnelCounts, normSource };
