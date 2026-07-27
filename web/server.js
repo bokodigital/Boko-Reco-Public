@@ -28,7 +28,7 @@ import { STOREFRONT_JS } from "./storefront-script.js";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
 const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
-const SCOPES = process.env.SCOPES || "read_orders,read_products,write_discounts,write_script_tags,write_themes";
+const SCOPES = process.env.SCOPES || "read_orders,read_products,write_discounts";
 const HOST = (process.env.HOST || "").replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();
@@ -88,39 +88,7 @@ async function ensureBundleDiscount(shop, token, cfg) {
   return { ok: true, gid: gid, updated: true };
 }
 
-// ---- Admin REST helper (used for theme file installs — no GraphQL Theme Asset API) ----
-async function restCall(shop, token, path, method, body) {
-  const r = await fetch(`https://${shop}/admin/api/${API}/${path}`, {
-    method: method || "GET",
-    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let json = null;
-  try { json = await r.json(); } catch (e) {}
-  return { ok: r.ok, status: r.status, json };
-}
-
-async function getMainTheme(shop, token) {
-  const r = await restCall(shop, token, "themes.json", "GET");
-  const themes = (r.json && r.json.themes) || [];
-  return themes.find((t) => t.role === "main") || null;
-}
-
-async function putThemeAsset(shop, token, themeId, key, value) {
-  return restCall(shop, token, `themes/${themeId}/assets.json`, "PUT", { asset: { key, value } });
-}
-
-async function getThemeAsset(shop, token, themeId, key) {
-  const r = await restCall(shop, token, `themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`, "GET");
-  return r.ok && r.json && r.json.asset ? r.json.asset : null;
-}
-
-// ---- Storefront widgets ScriptTag (rail + cart drawer, no theme-app-extension) ----
-async function findStorefrontScriptTag(shop, token) {
-  const j = await gql(shop, token, `{ scriptTags(first:20){ edges{ node{ id src } } } }`, {});
-  const edges = (j.data && j.data.scriptTags && j.data.scriptTags.edges) || [];
-  return edges.map((e) => e.node).find((n) => n.src && n.src.includes("/storefront.js")) || null;
-}
+// (Asset API + ScriptTag helpers removed — widgets ship via theme app extension blocks)
 
 // ---- Billing (gated by BILLING_ENABLED env flag) ----
 const BILLING_ON = process.env.BILLING_ENABLED === "true";
@@ -559,10 +527,8 @@ app.post("/settings", express.json(), async (req, res) => {
   }
 });
 
-// ---------- No-theme-app-extension storefront setup ----------
-// Resolves the shop + admin token from either a dashboard session token
-// (Authorization: Bearer <id_token>) — used by /setup-theme, /enable-widgets,
-// /disable-widgets, /storefront-status.
+// ---------- Session-token → admin token helper ----------
+// Resolves the shop + admin token from a dashboard session token (Authorization: Bearer <id_token>).
 async function shopAndTokenFromRequest(req) {
   const idToken = (req.headers.authorization || "").replace(/^Bearer /, "");
   const shop = shopFromSessionToken(idToken);
@@ -574,95 +540,6 @@ async function shopAndTokenFromRequest(req) {
 
 const SFY_SECTION_KEY = "sections/boko-selected-for-you.liquid";
 const SFY_TEMPLATE_KEY = "templates/page.selected-for-you.json";
-
-app.post("/setup-theme", async (req, res) => {
-  res.set("Content-Type", "application/json");
-  try {
-    const { shop, token } = await shopAndTokenFromRequest(req);
-    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
-    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
-    const theme = await getMainTheme(shop, token);
-    if (!theme) return res.status(200).send(JSON.stringify({ ok: false, error: "Could not find the shop's main theme." }));
-    const sectionRes = await putThemeAsset(shop, token, theme.id, SFY_SECTION_KEY, SFY_SECTION_LIQUID);
-    if (!sectionRes.ok) {
-      const msg = (sectionRes.json && sectionRes.json.errors) ? JSON.stringify(sectionRes.json.errors) : ("HTTP " + sectionRes.status);
-      const needsScope = sectionRes.status === 403 || sectionRes.status === 401;
-      return res.status(200).send(JSON.stringify({ ok: false, error: needsScope ? "The store hasn't approved the write_themes permission yet. Reopen the app from Shopify Admin to re-consent, then try again." : ("Could not write the section file: " + msg) }));
-    }
-    const templateRes = await putThemeAsset(shop, token, theme.id, SFY_TEMPLATE_KEY, JSON.stringify(SFY_PAGE_TEMPLATE, null, 2));
-    if (!templateRes.ok) {
-      const msg = (templateRes.json && templateRes.json.errors) ? JSON.stringify(templateRes.json.errors) : ("HTTP " + templateRes.status);
-      return res.status(200).send(JSON.stringify({ ok: false, error: "Section installed, but the page template failed to write: " + msg }));
-    }
-    res.status(200).send(JSON.stringify({
-      ok: true,
-      themeName: theme.name,
-      instructions: "Installed. Now open your theme editor (Online Store > Themes > Customize), click Add section, choose 'Selected For You', place it on any page, then Save.",
-    }));
-  } catch (e) {
-    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
-  }
-});
-
-app.get("/storefront-status", async (req, res) => {
-  res.set("Content-Type", "application/json");
-  try {
-    const { shop, token } = await shopAndTokenFromRequest(req);
-    if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
-    if (!token) return res.status(200).send(JSON.stringify({ error: "not installed" }));
-    const theme = await getMainTheme(shop, token);
-    const [asset, scriptTag] = await Promise.all([
-      theme ? getThemeAsset(shop, token, theme.id, SFY_SECTION_KEY) : Promise.resolve(null),
-      findStorefrontScriptTag(shop, token),
-    ]);
-    res.status(200).send(JSON.stringify({
-      themeName: theme ? theme.name : null,
-      themeInstalled: !!asset,
-      widgetsEnabled: !!scriptTag,
-    }));
-  } catch (e) {
-    res.status(200).send(JSON.stringify({ error: e.message }));
-  }
-});
-
-app.post("/enable-widgets", async (req, res) => {
-  res.set("Content-Type", "application/json");
-  try {
-    const { shop, token } = await shopAndTokenFromRequest(req);
-    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
-    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
-    const existing = await findStorefrontScriptTag(shop, token);
-    if (existing) return res.status(200).send(JSON.stringify({ ok: true, alreadyEnabled: true }));
-    const j = await gql(shop, token,
-      `mutation($input:ScriptTagInput!){ scriptTagCreate(input:$input){ scriptTag{ id src } userErrors{ field message } } }`,
-      { input: { src: HOST + "/storefront.js", displayScope: "ONLINE_STORE", cache: false } });
-    const userErrors = j.data && j.data.scriptTagCreate && j.data.scriptTagCreate.userErrors;
-    if (userErrors && userErrors.length) return res.status(200).send(JSON.stringify({ ok: false, error: userErrors.map((e) => e.message).join("; ") }));
-    if (j.errors) return res.status(200).send(JSON.stringify({ ok: false, error: JSON.stringify(j.errors) }));
-    res.status(200).send(JSON.stringify({ ok: true }));
-  } catch (e) {
-    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
-  }
-});
-
-app.post("/disable-widgets", async (req, res) => {
-  res.set("Content-Type", "application/json");
-  try {
-    const { shop, token } = await shopAndTokenFromRequest(req);
-    if (!shop) return res.status(401).send(JSON.stringify({ ok: false, error: "unauthorized" }));
-    if (!token) return res.status(200).send(JSON.stringify({ ok: false, error: "not installed" }));
-    const existing = await findStorefrontScriptTag(shop, token);
-    if (!existing) return res.status(200).send(JSON.stringify({ ok: true, alreadyDisabled: true }));
-    const j = await gql(shop, token,
-      `mutation($id:ID!){ scriptTagDelete(id:$id){ deletedScriptTagId userErrors{ message } } }`,
-      { id: existing.id });
-    const userErrors = j.data && j.data.scriptTagDelete && j.data.scriptTagDelete.userErrors;
-    if (userErrors && userErrors.length) return res.status(200).send(JSON.stringify({ ok: false, error: userErrors.map((e) => e.message).join("; ") }));
-    res.status(200).send(JSON.stringify({ ok: true }));
-  } catch (e) {
-    res.status(200).send(JSON.stringify({ ok: false, error: e.message }));
-  }
-});
 
 // ---------- Public storefront widgets script (served via ScriptTag, no theme-app-extension) ----------
 app.get("/storefront.js", (req, res) => {
