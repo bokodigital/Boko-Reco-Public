@@ -622,7 +622,6 @@ input:disabled+.slider{opacity:.5;cursor:default}
   <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
   <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
   <button class="tab-btn" id="tabBtnInstall" type="button">Installation guide</button>
-  <button class="tab-btn" id="tabBtnSf" type="button" style="display:none">Storefront setup</button>
 </div>
 <div id="tab-performance">
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
@@ -705,23 +704,6 @@ input:disabled+.slider{opacity:.5;cursor:default}
   <div class="cz-multiselect" id="czCollections"></div>
 </div>
 <div class="cz-save"><button id="czSaveBtn" type="button">Save changes</button><span class="cz-status" id="czStatus"></span></div>
-</div>
-<div id="tab-storefront" style="display:none">
-<p class="sub">Install widgets directly on your storefront — no app-embed or theme editor step required.</p>
-<div class="sf-card">
-  <h3>Selected For You section</h3>
-        <p class="sub" style="margin:0 0 10px">A dedicated recommendations page for your shoppers &mdash; no code needed. Set it up in three parts:</p>
-        <p class="sub" style="margin:0 0 6px"><strong>1. Create the page.</strong> Online Store &rarr; Pages &rarr; Add page. Title it <strong>Selected For You</strong>, leave the content blank, then Save.</p>
-        <p class="sub" style="margin:0 0 6px"><strong>2. Add the section.</strong> Online Store &rarr; Themes &rarr; Customize. At the top of the editor pick <strong>Pages &rarr; Selected For You</strong>, click <strong>Add section</strong>, choose <strong>Apps &rarr; Selected For You</strong>, then Save.</p>
-        <p class="sub" style="margin:0 0 14px"><strong>3. Add it to your menu.</strong> Online Store &rarr; Navigation &rarr; open your <strong>Main menu</strong> &rarr; <strong>Add menu item</strong>. Name it <strong>Selected For You</strong>, set the Link to <strong>Pages &rarr; Selected For You</strong>, click Add, then <strong>Save menu</strong>. Shoppers can now find the page from your store navigation.</p>
-        <div style="display:none"><span id="sfThemeName"></span><span id="sfThemeStatus"></span><button id="sfInstallBtn" type="button"></button><div class="sf-msg" id="sfThemeMsg"></div></div>
-</div>
-<div class="sf-card">
-  <h3>Product page rail &amp; cart drawer widgets <span class="sf-status" id="sfWidgetStatus">checking…</span></h3>
-  <p class="sub" style="margin:0 0 14px">Adds a small script to your storefront that shows a recommendation rail on product pages and a carousel in the cart drawer — no theme edits needed.</p>
-  <div class="sf-row"><label class="switch"><input type="checkbox" id="sfWidgetToggle" disabled><span class="slider"></span></label><span class="sub" style="margin:0">Enable rail &amp; cart widgets</span></div>
-  <div class="sf-msg" id="sfWidgetMsg"></div>
-</div>
 </div>
 <script>
 var CUR="";
@@ -827,72 +809,18 @@ document.getElementById("czSaveBtn").addEventListener("click",function(){
     }).catch(function(){ status.textContent="Couldn't save changes."; });
   })();
 });
-var sfLoaded=false;
-function sfSetStatus(el,on,onText,offText){
-  el.textContent=on?onText:offText;
-  el.classList.toggle("on",!!on);
-}
-function loadStorefront(){
-  if(sfLoaded) return;
-  sfLoaded=true;
-  authedFetch("/storefront-status").then(function(d){
-    if(d.error){
-      document.getElementById("sfThemeMsg").innerHTML="<span class='err'>Couldn't load status: "+d.error+"</span>";
-      return;
-    }
-    document.getElementById("sfThemeName").textContent=d.themeName||"–";
-    sfSetStatus(document.getElementById("sfThemeStatus"),d.themeInstalled,"Installed","Not installed");
-    sfSetStatus(document.getElementById("sfWidgetStatus"),d.widgetsEnabled,"Enabled","Disabled");
-    var toggle=document.getElementById("sfWidgetToggle");
-    toggle.checked=!!d.widgetsEnabled;
-    toggle.disabled=false;
-  }).catch(function(){
-    document.getElementById("sfThemeMsg").innerHTML="<span class='err'>Couldn't load status.</span>";
-  });
-}
-document.getElementById("sfInstallBtn").addEventListener("click",function(){
-  var btn=document.getElementById("sfInstallBtn");
-  var msg=document.getElementById("sfThemeMsg");
-  btn.disabled=true; msg.className="sf-msg"; msg.textContent="Installing…";
-  authedPost("/setup-theme").then(function(d){
-    btn.disabled=false;
-    if(!d.ok){ msg.className="sf-msg err"; msg.textContent=d.error||"Something went wrong."; return; }
-    sfSetStatus(document.getElementById("sfThemeStatus"),true,"Installed","Not installed");
-    document.getElementById("sfThemeName").textContent=d.themeName||"–";
-    msg.className="sf-msg"; msg.textContent=d.instructions||"Installed.";
-  }).catch(function(){
-    btn.disabled=false; msg.className="sf-msg err"; msg.textContent="Couldn't reach the server.";
-  });
-});
-document.getElementById("sfWidgetToggle").addEventListener("change",function(){
-  var toggle=this; var msg=document.getElementById("sfWidgetMsg");
-  var enabling=toggle.checked;
-  toggle.disabled=true; msg.className="sf-msg"; msg.textContent=enabling?"Enabling…":"Disabling…";
-  authedPost(enabling?"/enable-widgets":"/disable-widgets").then(function(d){
-    toggle.disabled=false;
-    if(!d.ok){ msg.className="sf-msg err"; msg.textContent=d.error||"Something went wrong."; toggle.checked=!enabling; return; }
-    sfSetStatus(document.getElementById("sfWidgetStatus"),enabling,"Enabled","Disabled");
-    msg.textContent="";
-  }).catch(function(){
-    toggle.disabled=false; msg.className="sf-msg err"; msg.textContent="Couldn't reach the server."; toggle.checked=!enabling;
-  });
-});
 function showTab(name){
   document.getElementById("tab-performance").style.display=(name==="perf")?"":"none";
   document.getElementById("tab-customizer").style.display=(name==="cz")?"":"none";
   document.getElementById("tab-installation").style.display=(name==="install")?"":"none";
-  document.getElementById("tab-storefront").style.display=(name==="sf")?"":"none";
   document.getElementById("tabBtnPerf").classList.toggle("active",name==="perf");
   document.getElementById("tabBtnCz").classList.toggle("active",name==="cz");
   document.getElementById("tabBtnInstall").classList.toggle("active",name==="install");
-  document.getElementById("tabBtnSf").classList.toggle("active",name==="sf");
   if(name==="cz") loadCustomizer();
-  if(name==="sf") loadStorefront();
 }
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
  document.getElementById("tabBtnInstall").addEventListener("click",function(){showTab("install");});
-document.getElementById("tabBtnSf").addEventListener("click",function(){showTab("sf");});
 
 /* Boko dashboard enhancer v2 — on-brand two-pane customizer. Purely additive. */
 (function(){
@@ -935,7 +863,7 @@ document.getElementById("tabBtnSf").addEventListener("click",function(){showTab(
  +"#czSaveBtn:hover,.sf-row button:hover{filter:brightness(.93);}"
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
- var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);var sfBtn=document.getElementById('tabBtnSf');if(sfBtn)sfBtn.style.display='none';
+ var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);
 (function(){
  var L="#BFFC00",INK="#0B0B0B",LINE="#E6E7EB",MUT="#6B7280";
  var s2=document.createElement('style');s2.textContent=""
