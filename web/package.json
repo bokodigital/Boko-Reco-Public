@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node test/engine.test.js"
+    "test": "node test/engine.test.mjs && node test/sector.test.mjs"
   },
   "dependencies": {
     "@shopify/shopify-api": "^11.0.0",
