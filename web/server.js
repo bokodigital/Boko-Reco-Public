@@ -29,7 +29,7 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
 const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
 const SCOPES = process.env.SCOPES || "read_orders,read_products,write_discounts";
-const HOST = (process.env.HOST || "").replace(/\/+$/, "");
+const HOST = ((process.env.HOST || "").replace(/^(?!https?:\/\/)/,"https://")).replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();
 
