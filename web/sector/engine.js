@@ -145,50 +145,123 @@ function scoreCandidate(cand, anchor, role, playbook, weights) {
   return s;
 }
 
+// ---- Declarative per-sector rules -------------------------------------------
+// Each playbook may carry a `rules` array of { when, then } entries. `when` is a
+// condition on the current request (anchor / cart / time-of-day / gift signal),
+// `then` is a "verb:role[,role]" directive. This turns the human-readable setup
+// logic ("in the morning, always finish with SPF") into concrete adjustments to
+// which roles we fill and in what order. Unknown conditions or verbs are ignored
+// (safe no-op), and hard-gate directives (gate:* / hardgate:*) are already
+// enforced by compatible(), so here they are treated as documentation.
+
+function evalCondition(when, ctx) {
+  if (!when || typeof when !== "object") return false;
+  if (when.always) return true;
+  const { anchor, cartRoles } = ctx;
+  if (when.timeOfDay != null) return ctx.timeOfDay === lc(when.timeOfDay);
+  if (when.cartHasRole != null) return cartRoles.has(lc(when.cartHasRole));
+  if (when.anchorHasAttr != null) { const v = attr(anchor, when.anchorHasAttr); return v != null && v !== false && v !== ""; }
+  if (when.anchorIsConsumable != null) return (!!(anchor && attr(anchor, "is_consumable") === true)) === !!when.anchorIsConsumable;
+  if (when.giftSignal != null) return !!ctx.giftSignal === !!when.giftSignal;
+  if (when.deviceType != null) {
+    const dt = anchor ? lc([attr(anchor, "device_type"), attr(anchor, "model_family"), anchor.category, anchor.productType, anchor.title].filter(Boolean).join(" ")) : "";
+    return dt.includes(lc(when.deviceType));
+  }
+  if (when.role != null) return true; // static, role-scoped ordering rule
+  return false;
+}
+
+// Compile the active rules into a plan: which roles to drop/require/prefer and
+// how to order them (first / last).
+function planFromRules(playbook, ctx) {
+  const plan = { drop: new Set(), require: new Set(), prefer: new Set(), add: new Set(), first: [], last: [] };
+  for (const rule of (playbook.rules || [])) {
+    let active = false;
+    try { active = evalCondition(rule.when, ctx); } catch (e) { active = false; }
+    if (!active) continue;
+    const then = String(rule.then || "");
+    const ci = then.indexOf(":");
+    const verb = (ci < 0 ? then : then.slice(0, ci)).trim();
+    const args = (ci < 0 ? "" : then.slice(ci + 1)).split(",").map((s) => lc(s.trim())).filter(Boolean);
+    switch (verb) {
+      case "require": args.forEach((r) => plan.require.add(r)); break;
+      case "exclude": args.forEach((r) => plan.drop.add(r)); break;
+      case "prefer": args.forEach((r) => plan.prefer.add(r)); break;
+      case "add": args.forEach((r) => { plan.add.add(r); plan.prefer.add(r); }); break;
+      case "first": args.forEach((r) => plan.first.push(r)); break;
+      case "surface": args.forEach((r) => { plan.first.push(r); plan.require.add(r); }); break;
+      case "order":
+        if (args[0] === "last" && rule.when && rule.when.role) plan.last.push(lc(rule.when.role));
+        break;
+      // diversify:* is the default behaviour; gate:* / hardgate:* handled by compatible()
+      default: break;
+    }
+  }
+  return plan;
+}
+
 // MAIN ENTRY. Sector-aware when `industry` is set; otherwise the current engine.
 export async function recommendForShop(opts) {
-  const { products = [], anchor = null, cart = [], industry = null, limit = 8, useLLM = false, weights = null, styleGroups = null } = opts || {};
+  const { products = [], anchor = null, cart = [], industry = null, limit = 8, useLLM = false, weights = null, styleGroups = null, timeOfDay = null, giftSignal = false } = opts || {};
   const playbook = getPlaybook(industry);
   // ---- SAFETY: no industry / no playbook -> exactly today's behaviour ----
   if (!industry || !playbook) return recommend({ products, anchor, limit, useLLM });
   try {
-    return await assemble({ products, anchor, cart, playbook, limit, useLLM, weights, styleGroups });
+    return await assemble({ products, anchor, cart, playbook, limit, useLLM, weights, styleGroups, timeOfDay, giftSignal });
   } catch (e) {
     console.error("[sector] fell back to base engine:", e && e.message);
     return recommend({ products, anchor, limit, useLLM });
   }
 }
 
-async function assemble({ products, anchor, cart, playbook, limit, useLLM, weights, styleGroups }) {
+async function assemble({ products, anchor, cart, playbook, limit, useLLM, weights, styleGroups, timeOfDay, giftSignal }) {
   const order = playbook.roleOrder || [];
   const anchorRole = anchor ? inferRole(anchor, playbook) : null;
   // roles already satisfied by the cart (and the anchor itself)
   const filled = new Set();
   if (anchorRole) filled.add(anchorRole);
   const cartIds = new Set();
-  for (const c of cart) { cartIds.add(c.id); const r = inferRole(c, playbook); if (r) filled.add(r); }
+  const cartRoles = new Set();
+  for (const c of cart) { cartIds.add(c.id); const r = inferRole(c, playbook); if (r) { filled.add(r); cartRoles.add(r); } }
   // the missing roles we want to fill, in setup order
-  const targetRoles = order.filter((r) => !filled.has(r));
+  let targetRoles = order.filter((r) => !filled.has(r));
 
-  // eligible candidates: a DIFFERENT, still-missing role, compatible, in stock, not in cart
+  // ---- apply this sector's declarative rules to the role plan ----
+  const ctx = {
+    anchor, cartRoles,
+    timeOfDay: lc(timeOfDay || attr(anchor, "time_of_day") || ""),
+    giftSignal: !!giftSignal || !!(anchor && lc(attr(anchor, "occasion")) === "gift"),
+  };
+  const plan = planFromRules(playbook, ctx);
+  if (plan.drop.size) targetRoles = targetRoles.filter((r) => !plan.drop.has(r));
+  for (const r of plan.add) if (!filled.has(r) && order.includes(r) && !targetRoles.includes(r)) targetRoles.push(r);
+  // final role priority: forced-first -> required -> preferred -> remaining -> forced-last
+  const priority = [];
+  const push = (r) => { if (r && targetRoles.includes(r) && !priority.includes(r)) priority.push(r); };
+  plan.first.forEach(push);
+  plan.require.forEach(push);
+  plan.prefer.forEach(push);
+  targetRoles.forEach((r) => { if (!plan.last.includes(r)) push(r); });
+  plan.last.forEach(push);
+
+  // eligible candidates: a DIFFERENT, still-wanted role, compatible, in stock, not in cart
   const byRole = new Map();
   for (const p of products) {
     if (!anchor || p.id === anchor.id) continue;
     if (cartIds.has(p.id)) continue;
     const role = inferRole(p, playbook);
-    if (!role || !targetRoles.includes(role)) continue;
+    if (!role || !priority.includes(role)) continue;
     if (!compatible(p, anchor, playbook, { styleGroups })) continue;
     if (!byRole.has(role)) byRole.set(role, []);
     byRole.get(role).push({ p, role, score: scoreCandidate(p, anchor, role, playbook, weights) });
   }
   for (const arr of byRole.values()) arr.sort((a, b) => b.score - a.score);
 
-  // one product per role, walking the setup in order (diversified, cart-aware)
+  // one product per role, walking the rule-adjusted setup order (diversified, cart-aware)
   const ordered = [];
-  const used = new Set();
-  for (const role of targetRoles) {
+  for (const role of priority) {
     const arr = byRole.get(role);
-    if (arr && arr.length) { ordered.push(arr[0].p); used.add(arr[0].p.id); if (ordered.length >= limit) break; }
+    if (arr && arr.length) { ordered.push(arr[0].p); if (ordered.length >= limit) break; }
   }
 
   // optional LLM polish on the assembled shortlist (off by default)

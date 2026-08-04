@@ -20,6 +20,8 @@ import express from "express";
 import crypto from "crypto";
 import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
+import { recommendForShop } from "./sector/engine.js";
+import { toEngineProduct, BOKO_METAFIELD_FRAGMENT } from "./sector/loader.js";
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
 import { SFY_SECTION_LIQUID, SFY_PAGE_TEMPLATE } from "./theme-assets.js";
@@ -284,10 +286,10 @@ function verifyProxy(query) {
   catch (e) { return false; }
 }
 
-async function loadProducts(shop, token, limit = 100, productType = "") {
+async function loadProducts(shop, token, limit = 100, productType = "", includeBoko = false) {
   const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
   const qstr = safe ? `status:active product_type:${safe}` : "status:active";
-  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
+  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } }${includeBoko ? " " + BOKO_METAFIELD_FRAGMENT : ""} } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
   const results = [];
@@ -319,9 +321,11 @@ async function loadProducts(shop, token, limit = 100, productType = "") {
     if (!v || !v.availableForSale) continue;
     results.push({ id: n.id, handle: n.handle, variantId: v.id, available: true,
       title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
+      productType: n.productType || "",
       price: parseFloat(v.price), img: (n.featuredImage && n.featuredImage.url) || "",
       orders: 0, views: 0, options, variants,
       collectionGids: collGids,
+      bokoMf: (n.metafields && n.metafields.edges) || [],
       createdAt: n.publishedAt || n.createdAt || null });
   }
   results.collectionsIndex = collectionsIndex;
@@ -339,7 +343,11 @@ app.get("/proxy/recommend", async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
     const atype = (req.query.atype || "").trim();
     const anum = (req.query.anchor || "").trim();
-    let products = await loadProducts(shop, token, 250);
+    // Multi-sector: is this shop opted into a sector playbook? If so, fetch boko.*
+    // metafields alongside products so the sector engine has attributes to work with.
+    let industry = null;
+    try { const ri = await db.get("boko_industry:" + shop); industry = (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) {}
+    let products = await loadProducts(shop, token, 250, "", !!industry);
     const settings = await loadSettings(shop);
     const excludeHandles = String(req.query.exclude || "").split(",").map((s) => s.trim()).filter(Boolean);
     const excludeGids = handlesToCollectionGids(excludeHandles, products.collectionsIndex || {});
@@ -354,7 +362,20 @@ app.get("/proxy/recommend", async (req, res) => {
       price: parseFloat(req.query.aprice || "0") || 0,
     } : null);
     if (anum) products = products.filter((p) => !p.id.endsWith(anum));
-    const items = await recommend({ products, anchor, limit });
+    let items;
+    if (industry) {
+      // ---- sector-aware path (dormant unless the shop set a business category) ----
+      const eng = products.map((p) => toEngineProduct(p, p.bokoMf || []));
+      const engAnchor = found ? toEngineProduct(found, found.bokoMf || []) : anchor;
+      const cartNums = String(req.query.cart || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const cart = cartNums.length ? eng.filter((p) => cartNums.some((c) => String(p.id).endsWith(c))) : [];
+      const tod = (req.query.tod || req.query.timeOfDay || "").trim();
+      const giftSignal = /^(1|true|yes)$/i.test(String(req.query.gift || ""));
+      const picks = await recommendForShop({ products: eng, anchor: engAnchor, cart, industry, limit, timeOfDay: tod, giftSignal });
+      items = picks.map(({ bokoMf, attrs, ...rest }) => rest); // drop internal fields from the payload
+    } else {
+      items = await recommend({ products, anchor, limit });
+    }
     res.status(200).send(JSON.stringify({ items }));
   } catch (e) {
     res.status(200).send(JSON.stringify({ items: [], error: e.message }));

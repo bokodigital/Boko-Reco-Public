@@ -101,5 +101,63 @@ const P = (id, o = {}) => ({ id, title: o.title || ("P" + id), price: o.price ||
   ok(new Set(r.map((p) => p.role)).size === r.length, "travel: one product per role");
 }
 
+// ---------- 9. Beauty rules: time-of-day drives SPF ----------
+{
+  const anchor = P(1, { role: "cleanse", title: "Cleanser", attrs: { skin_type: "normal" } });
+  const products = [P(3, { role: "tone" }), P(5, { role: "moisturise" }), P(6, { role: "protect", title: "SPF 50" })];
+  const pm = await recommendForShop({ products, anchor, industry: "Beauty", limit: 8, timeOfDay: "PM" });
+  ok(!ids(pm).includes(6), "beauty PM: excludes SPF/protect at night");
+  const am = await recommendForShop({ products, anchor, industry: "Beauty", limit: 8, timeOfDay: "AM" });
+  ok(ids(am).includes(6), "beauty AM: keeps SPF/protect in the morning");
+}
+
+// ---------- 10. Beauty rules: anchor already has SPF -> no separate protect ----------
+{
+  const anchor = P(1, { role: "moisturise", title: "Day Cream", attrs: { spf: "30" } });
+  const products = [P(3, { role: "tone" }), P(6, { role: "protect", title: "SPF 50" })];
+  const r = await recommendForShop({ products, anchor, industry: "Beauty", limit: 8 });
+  ok(!ids(r).includes(6), "beauty: anchor with SPF suppresses a separate protect step");
+}
+
+// ---------- 11. Food & Beverage rules: consumable anchor surfaces the refill ----------
+{
+  const anchor = P(1, { role: "main", title: "Coffee Beans", attrs: { is_consumable: true, dietary_flags: [] } });
+  const products = [
+    P(2, { role: "tool", title: "Filters" }),
+    P(3, { role: "refill", title: "Value Pack", attrs: { dietary_flags: [] } }),
+    P(4, { role: "accompaniment", title: "Biscuits", attrs: { dietary_flags: [] } }),
+  ];
+  const r = await recommendForShop({ products, anchor, industry: "Food & Beverage", limit: 1 });
+  ok(ids(r).includes(3), "food: consumable anchor surfaces the refill first (limit 1)");
+}
+
+// ---------- 12. Jewellery rules: gift signal surfaces gift + care ----------
+{
+  const anchor = P(1, { role: "necklace", title: "Gold Necklace", attrs: { metal: "gold", style: "classic" } });
+  const products = [
+    P(2, { role: "earrings", attrs: { metal: "gold", style: "classic" } }),
+    P(3, { role: "bracelet", attrs: { metal: "gold", style: "classic" } }),
+    P(7, { role: "gift", title: "Gift Box" }),
+    P(8, { role: "care", title: "Care Kit" }),
+  ];
+  const withGift = await recommendForShop({ products, anchor, industry: "Jewellery", limit: 2, giftSignal: true });
+  ok(ids(withGift).includes(7) && ids(withGift).includes(8), "jewellery: gift signal surfaces gift+care first");
+  const noGift = await recommendForShop({ products, anchor, industry: "Jewellery", limit: 2, giftSignal: false });
+  ok(!ids(noGift).includes(7) && !ids(noGift).includes(8), "jewellery: without gift signal, jewellery pieces come first");
+}
+
+// ---------- 13. Home & Living rules: decor is ordered last ----------
+{
+  const anchor = P(1, { role: "anchor", title: "Sofa", attrs: { style: "scandi", colour_palette: "neutral", indoor_outdoor: "indoor" } });
+  const products = [
+    P(2, { role: "support", title: "Coffee Table", attrs: { style: "scandi", indoor_outdoor: "indoor" } }),
+    P(3, { role: "lighting", title: "Floor Lamp", attrs: { style: "modern", indoor_outdoor: "indoor" } }),
+    P(4, { role: "decor", title: "Vase", attrs: { style: "minimalist", indoor_outdoor: "indoor" } }),
+  ];
+  const r = await recommendForShop({ products, anchor, industry: "Home & Living", limit: 2 });
+  ok(ids(r).includes(2) && ids(r).includes(3), "home: fills support + lighting first");
+  ok(!ids(r).includes(4), "home: decor ordered last (dropped when limit is tight)");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
