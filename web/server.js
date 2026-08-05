@@ -678,7 +678,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div class="hero"><div><div class="v lime" id="revTotal">–</div><div class="x">total revenue from recommendations</div></div>
 <div style="margin-left:auto"><div class="v" id="itemTotal">–</div><div class="x">items purchased</div></div></div>
 <div class="cards">
-  <div class="card"><span class="pill">Product page rail</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
+  <div class="card"><span class="pill">Complete the Look</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="pdpRows"></tbody></table></div>
   <div class="card"><span class="pill">Cart drawer carousel</span><div class="big" id="cdTotal">–</div><div class="rev" id="cdRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
@@ -814,7 +814,7 @@ function load(){
 }
 document.getElementById("days").addEventListener("change",load); load();
 
-var CZ_COMPONENTS=[["rail","Product page rail"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
+var CZ_COMPONENTS=[["rail","Complete the Look"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
 var czState=null, czCollections=[], czLoaded=false;
 function czField(comp,key,label,type,extra){
   extra=extra||"";
@@ -823,7 +823,7 @@ function czField(comp,key,label,type,extra){
 function renderCzGrid(){
   var fonts=["Roboto","Open Sans","Lato","Montserrat","Poppins","Inter","Oswald","Raleway","Nunito","Playfair Display","Merriweather","Rubik","Work Sans","Noto Sans","Mulish"];
   var opts="<option value=''>Default (theme font)</option>"+fonts.map(function(f){return "<option value='"+f+"'>"+f+"</option>";}).join("");
-  var html="<div class='cz-design'><h3>Design</h3><p class='sub' style='margin:0 0 16px'>These styles apply to all three recommendation widgets: Product Rail, Cart Drawer and Selected For You.</p>"
+  var html="<div class='cz-design'><h3>Design</h3><p class='sub' style='margin:0 0 16px'>These styles apply to all three recommendation widgets: Complete the Look, Cart Drawer and Selected For You.</p>"
    +"<div class='cz-field'><label>Font family</label><select id='cz-fontFamily'>"+opts+"</select></div>"
    +"<div class='cz-row2'><div class='cz-field'><label>Heading font size (px)</label><input id='cz-headingSize' type='number' min='10' max='60'></div><div class='cz-field'><label>Subtitle font size (px)</label><input id='cz-subtitleSize' type='number' min='8' max='40'></div></div>"
    +"<div class='cz-row2'><div class='cz-field'><label>Product title font size (px)</label><input id='cz-titleSize' type='number' min='8' max='40'></div><div class='cz-field'></div></div>"
@@ -984,7 +984,7 @@ bkInitGate();
  function money(n,cur){try{return new Intl.NumberFormat(undefined,{style:'currency',currency:cur||'USD',currencyDisplay:'code',maximumFractionDigits:0}).format(n||0);}catch(e){return (cur||'')+' '+Math.round(Number(n||0));}}
  function pct(a,b){if(!b)return '0%';return Math.round((a/b)*100)+'%';}
  function W(v,mx){var p=mx>0?Math.round((v/mx)*100):0;if(v>0&&p<4)p=4;return p;}
- var COMPS=[{name:'Selected For You',stat:'sfy_page',fk:['sfy','page','sfy_page','selected-for-you','selected-for-you-page']},{name:'Product Rail (PDP)',stat:'pdp',fk:['pdp','rail','product_rail']},{name:'Cart Drawer',stat:'cart_drawer',fk:['cart','cart_drawer','cart-drawer']}];
+ var COMPS=[{name:'Complete the Look',stat:'pdp',fk:['pdp','rail','product_rail','ctl','complete_look','complete-the-look']},{name:'Selected For You',stat:'sfy_page',fk:['sfy','page','sfy_page','selected-for-you','selected-for-you-page']},{name:'Cart Drawer',stat:'cart_drawer',fk:['cart','cart_drawer','cart-drawer']}];
  function fv(funnel,keys,ev){var t=0;for(var i=0;i<keys.length;i++){var b=funnel[keys[i]];if(b&&b[ev])t+=b[ev];}return t;}
  function render(funnel,stats){
   funnel=funnel||{};stats=stats||{};
