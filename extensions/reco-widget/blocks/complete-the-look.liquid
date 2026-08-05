@@ -19,21 +19,37 @@
     assign eyebrow = product.collections.first.title
   endif
   assign limit = block.settings.limit | default: 4
+  assign cols = limit
+  if cols > 4
+    assign cols = 4
+  endif
   assign cur = product.selected_or_first_available_variant
+  assign font_css = "inherit"
+  assign gfont = ""
+  unless block.settings.use_theme_fonts
+    if block.settings.font_family != blank
+      assign font_css = block.settings.font_family | prepend: "'" | append: "',sans-serif"
+      assign gfont = block.settings.font_family | replace: " ", "+"
+    endif
+  endunless
 -%}
 
 {%- if product -%}
 <style>
+{%- if font_css != "inherit" -%}
+#boko-ctl-{{ block.id }},#boko-ctl-{{ block.id }} h2,#boko-ctl-{{ block.id }} h3,#boko-ctl-{{ block.id }} p,#boko-ctl-{{ block.id }} span,#boko-ctl-{{ block.id }} a,#boko-ctl-{{ block.id }} button,#boko-ctl-{{ block.id }} label,#boko-ctl-{{ block.id }} div{font-family:var(--ctl-font) !important;}
+{%- endif -%}
 #boko-ctl-{{ block.id }}{--ink:#1f2320;--muted:#8b8f8c;--line:#e6e6e3;--sel:#1f2320;--bg:#fff;
-  font-family:{% if block.settings.use_theme_fonts %}inherit{% else %}'Jost','Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif{% endif %};
+  --ctl-font:{{ font_css }};--ctl-body:{{ block.settings.body_size | default: 14 }}px;--ctl-head:{{ block.settings.heading_size | default: 30 }}px;
+  font-family:var(--ctl-font);font-size:var(--ctl-body);
   color:var(--ink);max-width:1360px;margin:48px auto;padding:0 20px;box-sizing:border-box}
 #boko-ctl-{{ block.id }} *{box-sizing:border-box}
 #boko-ctl-{{ block.id }} .boko-ctl__wrap{display:grid;grid-template-columns:minmax(220px,1fr) 3.4fr;gap:36px;align-items:start}
 /* left current product */
-#boko-ctl-{{ block.id }} .boko-ctl__cimg{position:relative;aspect-ratio:3/4;overflow:hidden;border-radius:10px;background:#f4f3f0}
+#boko-ctl-{{ block.id }} .boko-ctl__cimg{position:relative;aspect-ratio:3/4;overflow:hidden;background:#f4f3f0}
 #boko-ctl-{{ block.id }} .boko-ctl__cimg img{width:100%;height:100%;object-fit:cover;display:block}
-#boko-ctl-{{ block.id }} .boko-ctl__ctitle{font-size:15px;letter-spacing:1.4px;text-transform:uppercase;font-weight:500;margin:16px 0 4px}
-#boko-ctl-{{ block.id }} .boko-ctl__cprice{font-size:15px;color:var(--ink);margin-bottom:14px}
+#boko-ctl-{{ block.id }} .boko-ctl__ctitle{font-size:var(--ctl-body);letter-spacing:1.4px;text-transform:uppercase;font-weight:500;margin:16px 0 4px}
+#boko-ctl-{{ block.id }} .boko-ctl__cprice{font-size:var(--ctl-body);color:var(--ink);margin-bottom:0}
 #boko-ctl-{{ block.id }} .boko-ctl__opt{margin:0 0 12px}
 #boko-ctl-{{ block.id }} .boko-ctl__optlabel{display:block;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
 #boko-ctl-{{ block.id }} .boko-ctl__chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -43,22 +59,21 @@
 #boko-ctl-{{ block.id }} .boko-ctl__chip.is-oos{opacity:.38;text-decoration:line-through;cursor:not-allowed}
 #boko-ctl-{{ block.id }} .boko-ctl__dot{width:22px;height:22px;border-radius:50%;padding:0;position:relative;border:1px solid var(--line)}
 #boko-ctl-{{ block.id }} .boko-ctl__dot.is-sel{box-shadow:0 0 0 2px #fff inset,0 0 0 2px var(--sel);border-color:var(--sel)}
-#boko-ctl-{{ block.id }} .boko-ctl__qtyrow{display:flex;align-items:center;gap:12px;margin:14px 0}
-#boko-ctl-{{ block.id }} .boko-ctl__qty{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:4px}
-#boko-ctl-{{ block.id }} .boko-ctl__qty button{width:34px;height:38px;border:none;background:#fff;font-size:16px;cursor:pointer;color:var(--ink)}
-#boko-ctl-{{ block.id }} .boko-ctl__qty input{width:38px;height:38px;border:none;text-align:center;font:inherit;font-size:14px;-moz-appearance:textfield}
-#boko-ctl-{{ block.id }} .boko-ctl__qty input::-webkit-outer-spin-button,#boko-ctl-{{ block.id }} .boko-ctl__qty input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-#boko-ctl-{{ block.id }} .boko-ctl__addcur{width:100%;border:none;background:var(--ink);color:#fff;font:inherit;font-size:13px;letter-spacing:1.6px;text-transform:uppercase;padding:15px;cursor:pointer;border-radius:4px;transition:.15s}
-#boko-ctl-{{ block.id }} .boko-ctl__addcur:hover{opacity:.9}
-#boko-ctl-{{ block.id }} .boko-ctl__addcur.is-added{background:#3f8f5f}
 /* right head */
 #boko-ctl-{{ block.id }} .boko-ctl__eyebrow{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
-#boko-ctl-{{ block.id }} .boko-ctl__heading{font-size:30px;line-height:1.1;font-weight:600;margin:0 0 22px}
+#boko-ctl-{{ block.id }} .boko-ctl__heading{font-size:var(--ctl-head);line-height:1.1;font-weight:600;margin:0 0 22px}
 /* right grid */
-#boko-ctl-{{ block.id }} .boko-ctl__grid{display:grid;grid-template-columns:repeat({{ limit }},minmax(0,1fr));gap:18px}
+#boko-ctl-{{ block.id }} .boko-ctl__vp{position:relative}
+#boko-ctl-{{ block.id }} .boko-ctl__grid{display:grid;grid-template-columns:repeat({{ cols }},minmax(0,1fr));gap:18px}
+#boko-ctl-{{ block.id }} .boko-ctl__grid--car{display:flex;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none}
+#boko-ctl-{{ block.id }} .boko-ctl__grid--car::-webkit-scrollbar{display:none}
+#boko-ctl-{{ block.id }} .boko-ctl__grid--car .boko-ctl__card{scroll-snap-align:start}
+#boko-ctl-{{ block.id }} .boko-ctl__cnav{position:absolute;top:38%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;z-index:4;display:flex;align-items:center;justify-content:center;font-size:19px;line-height:1;box-shadow:0 2px 10px rgba(0,0,0,.14)}
+#boko-ctl-{{ block.id }} .boko-ctl__cprev{left:-6px}#boko-ctl-{{ block.id }} .boko-ctl__cnext{right:-6px}
+#boko-ctl-{{ block.id }} .boko-ctl__cnav:disabled{opacity:.3;cursor:not-allowed;box-shadow:none}
 #boko-ctl-{{ block.id }} .boko-ctl__loading{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px 0}
 #boko-ctl-{{ block.id }} .boko-ctl__card{position:relative;display:flex;flex-direction:column}
-#boko-ctl-{{ block.id }} .boko-ctl__imgwrap{position:relative;aspect-ratio:3/4;overflow:hidden;border-radius:10px;background:#f4f3f0}
+#boko-ctl-{{ block.id }} .boko-ctl__imgwrap{position:relative;aspect-ratio:3/4;overflow:hidden;background:#f4f3f0}
 #boko-ctl-{{ block.id }} .boko-ctl__imgwrap img{width:100%;height:100%;object-fit:cover;display:block}
 #boko-ctl-{{ block.id }} .boko-ctl__bundle{position:absolute;top:10px;right:10px;z-index:3;display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:99px;padding:4px 10px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink);cursor:pointer;user-select:none}
 #boko-ctl-{{ block.id }} .boko-ctl__bundle input{accent-color:var(--sel);margin:0;cursor:pointer}
@@ -66,9 +81,9 @@
 #boko-ctl-{{ block.id }} .boko-ctl__card:hover .boko-ctl__add,#boko-ctl-{{ block.id }} .boko-ctl__add:focus{opacity:1;transform:translateY(0)}
 #boko-ctl-{{ block.id }} .boko-ctl__add.is-added{background:#3f8f5f}
 #boko-ctl-{{ block.id }} .boko-ctl__cbody{padding:14px 2px 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
-#boko-ctl-{{ block.id }} .boko-ctl__vendor{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
-#boko-ctl-{{ block.id }} .boko-ctl__rtitle{font-size:14px;letter-spacing:.3px;font-weight:400}
-#boko-ctl-{{ block.id }} .boko-ctl__rprice{font-size:15px}
+#boko-ctl-{{ block.id }} .boko-ctl__vendor{font-size:calc(var(--ctl-body) - 3px);letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+#boko-ctl-{{ block.id }} .boko-ctl__rtitle{font-size:var(--ctl-body);letter-spacing:.3px;font-weight:400}
+#boko-ctl-{{ block.id }} .boko-ctl__rprice{font-size:calc(var(--ctl-body) + 1px)}
 #boko-ctl-{{ block.id }} .boko-ctl__ropts{width:100%;display:flex;flex-direction:column;gap:8px;margin-top:6px}
 #boko-ctl-{{ block.id }} .boko-ctl__rchiprow{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
 /* bundle bar */
@@ -114,38 +129,6 @@
       <div class="boko-ctl__cinfo">
         <h3 class="boko-ctl__ctitle">{{ product.title }}</h3>
         <div class="boko-ctl__cprice" data-cur-price>{{ cur.price | money }}</div>
-
-        {%- unless product.has_only_default_variant -%}
-          {%- for opt in product.options_with_values -%}
-            <div class="boko-ctl__opt" data-opt-index="{{ forloop.index0 }}">
-              <span class="boko-ctl__optlabel">{{ opt.name }}</span>
-              <div class="boko-ctl__chips">
-                {%- assign is_colour = false -%}
-                {%- assign oname = opt.name | downcase -%}
-                {%- if oname contains 'colour' or oname contains 'color' -%}{%- assign is_colour = true -%}{%- endif -%}
-                {%- for val in opt.values -%}
-                  <button type="button"
-                    class="boko-ctl__chip{% if is_colour %} boko-ctl__dot{% endif %}{% if opt.selected_value == val %} is-sel{% endif %}"
-                    data-opt="{{ forloop.parent.forloop.index0 }}" data-val="{{ val | escape }}"
-                    {% if is_colour %}style="background:{{ val | handle }}" title="{{ val | escape }}"{% endif %}>{% unless is_colour %}{{ val }}{% endunless %}</button>
-                {%- endfor -%}
-              </div>
-            </div>
-          {%- endfor -%}
-        {%- endunless -%}
-
-        <div class="boko-ctl__qtyrow">
-          <div class="boko-ctl__qty">
-            <button type="button" data-qminus aria-label="Decrease">&minus;</button>
-            <input type="text" inputmode="numeric" value="1" data-qty aria-label="Quantity">
-            <button type="button" data-qplus aria-label="Increase">+</button>
-          </div>
-        </div>
-
-        <button type="button" class="boko-ctl__addcur" data-add-current
-          data-variant="{{ cur.id }}" {% unless cur.available %}disabled{% endunless %}>
-          {% if cur.available %}Add to Cart{% else %}Sold out{% endif %}
-        </button>
       </div>
     </div>
 
@@ -167,13 +150,19 @@
 (function(){
   var root=document.getElementById("boko-ctl-{{ block.id }}");
   if(!root||root.dataset.bokoInit)return;root.dataset.bokoInit="1";
-  var PRODUCT={{ product | json }};
   var proxy=root.getAttribute("data-proxy")||"/apps/reco/recommend";
   var limit=parseInt(root.getAttribute("data-limit")||"4",10);
   var anchor=root.getAttribute("data-anchor")||"";
   var aType=root.getAttribute("data-atype")||"",aTitle=root.getAttribute("data-atitle")||"",aTags=root.getAttribute("data-atags")||"",aPrice=root.getAttribute("data-aprice")||"";
   var grid=root.querySelector("[data-ctl-grid]");
   var bundle=[],ITEMS={},bar,discount=0,minItems=2;
+
+  /* ---------- Google font (optional) ---------- */
+  try{var _gf="{{ gfont }}";if(_gf){var _id="boko-gf-"+_gf;if(!document.getElementById(_id)){var _l=document.createElement("link");_l.id=_id;_l.rel="stylesheet";_l.href="https://fonts.googleapis.com/css2?family="+_gf+":wght@400;500;600;700&display=swap";document.head.appendChild(_l);}}}catch(e){}
+
+  /* ---------- funnel tracking (impression / click / add_to_cart) ---------- */
+  function bokoTrack(ev){try{var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/track");var b=JSON.stringify({event:ev,source:"pdp"});if(navigator.sendBeacon){navigator.sendBeacon(u,new Blob([b],{type:"application/json"}));}else{fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:b,keepalive:true});}}catch(e){}}
+  try{root.addEventListener("click",function(e){var t=e.target;if(!t||!t.closest)return;var bt=t.closest("button");var an=t.closest("a");if(bt&&/add/i.test(bt.textContent||"")){bokoTrack("add_to_cart");}else if(an){bokoTrack("click");}},true);}catch(e){}
 
   function money(n){return "$"+Number(n).toFixed(2);}
   function el(h){var d=document.createElement("div");d.innerHTML=h.trim();return d.firstChild;}
@@ -185,39 +174,12 @@
   function notify(count){try{document.querySelectorAll(".cart-count-bubble,.cart-count,[data-cart-count],#CartCount,.cart-link__bubble,.cart-count-number,[data-cart-item-count]").forEach(function(e){var n=e.querySelector("span")||e;if(/^\s*\d+\s*$/.test(n.textContent||""))n.textContent=count;});}catch(e){}["cart:refresh","cart:updated","ajaxCart:afterCartLoad"].forEach(function(ev){document.dispatchEvent(new CustomEvent(ev,{bubbles:true}));});document.dispatchEvent(new CustomEvent("boko:cart:added"));}
   function reloadDrawer(count){var cd=document.querySelector("cart-drawer");if(cd&&cd.getSectionsToRender&&typeof cd.renderContents==="function"){var ids=cd.getSectionsToRender().map(function(s){return s.id;});fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:ids,sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(j){try{cd.renderContents(j);if(typeof cd.open==="function")cd.open();}catch(e){}notify(count);}).catch(function(){notify(count);});}else{notify(count);}}
   function addItems(items){ // items: [{id, quantity}]
+    items=items.map(function(it){return {id:it.id,quantity:it.quantity,properties:{"_boko_reco":"pdp"}};});
     return fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:items})})
       .then(function(r){if(!r.ok)throw 0;return r.json();})
       .then(function(){return fetch("/cart.js",{headers:{Accept:"application/json"}}).then(function(r){return r.json();});})
       .then(function(c){toast("✓ Added to cart");reloadDrawer(c.item_count);return c;});
   }
-
-  /* ---------- LEFT: current product ---------- */
-  (function currentProduct(){
-    if(!PRODUCT||!PRODUCT.variants)return;
-    var sel=(PRODUCT.options||[]).map(function(_,i){var v=(PRODUCT.variants||[]).filter(function(x){return x.available;})[0]||PRODUCT.variants[0];return v?v.options[i]:null;});
-    var priceEl=root.querySelector("[data-cur-price]"),addBtn=root.querySelector("[data-add-current]");
-    function resolve(){
-      var v=null;
-      for(var i=0;i<PRODUCT.variants.length;i++){var x=PRODUCT.variants[i],ok=true;for(var k=0;k<sel.length;k++){if(sel[k]!=null&&x.options[k]!==sel[k]){ok=false;break;}}if(ok){v=x;break;}}
-      if(v){addBtn.setAttribute("data-variant",v.id);if(priceEl)priceEl.textContent=money(v.price/100);addBtn.disabled=!v.available;addBtn.textContent=v.available?"Add to Cart":"Sold out";}
-      return v;
-    }
-    root.querySelectorAll(".boko-ctl__current .boko-ctl__chip").forEach(function(ch){
-      ch.addEventListener("click",function(){
-        var oi=parseInt(ch.getAttribute("data-opt"),10);sel[oi]=ch.getAttribute("data-val");
-        var row=ch.closest(".boko-ctl__chips");row.querySelectorAll(".boko-ctl__chip").forEach(function(c){c.classList.remove("is-sel");});ch.classList.add("is-sel");
-        resolve();
-      });
-    });
-    var qEl=root.querySelector("[data-qty]");
-    root.querySelector("[data-qminus]").addEventListener("click",function(){qEl.value=Math.max(1,(parseInt(qEl.value,10)||1)-1);});
-    root.querySelector("[data-qplus]").addEventListener("click",function(){qEl.value=(parseInt(qEl.value,10)||1)+1;});
-    addBtn.addEventListener("click",function(){
-      var vid=addBtn.getAttribute("data-variant");if(!vid)return;var q=Math.max(1,parseInt(qEl.value,10)||1);
-      addBtn.textContent="Adding…";addItems([{id:parseInt(vnum(vid),10),quantity:q}]).then(function(){addBtn.textContent="Added";addBtn.classList.add("is-added");setTimeout(function(){addBtn.classList.remove("is-added");resolve();},1400);}).catch(function(){addBtn.textContent="Try again";});
-    });
-    resolve();
-  })();
 
   /* ---------- RIGHT: recommendations (same engine as existing widget) ---------- */
   try{fetch(proxy.replace(/\/recommend\/?$/,"/config"),{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(cfg){var b=cfg&&cfg.global&&cfg.global.bundle;if(!b)return;if(b.percentage>0)discount=Number(b.percentage);if(b.minItems>0)minItems=Number(b.minItems);renderBar();}).catch(function(){});}catch(e){}
@@ -275,11 +237,29 @@
     return c;
   }
 
+  function setupCarousel(){
+    if(grid.getAttribute("data-car"))return;grid.setAttribute("data-car","1");
+    grid.classList.add("boko-ctl__grid--car");
+    var per=Math.min(cols,4);
+    function sizeCards(){var gap=parseFloat(getComputedStyle(grid).columnGap||getComputedStyle(grid).gap)||18;var w=grid.clientWidth||root.clientWidth||window.innerWidth;var MIN=window.innerWidth<=640?150:200;var n=Math.floor((w+gap)/(MIN+gap));n=Math.max(2,Math.min(per,n||2));Array.prototype.forEach.call(grid.children,function(c){c.style.flex="0 0 calc((100% - "+((n-1)*gap)+"px) / "+n+")";});}
+    sizeCards();
+    var vp=document.createElement("div");vp.className="boko-ctl__vp";grid.parentNode.insertBefore(vp,grid);vp.appendChild(grid);
+    var prev=document.createElement("button");prev.type="button";prev.className="boko-ctl__cnav boko-ctl__cprev";prev.setAttribute("aria-label","Previous");prev.innerHTML="&#8249;";
+    var next=document.createElement("button");next.type="button";next.className="boko-ctl__cnav boko-ctl__cnext";next.setAttribute("aria-label","Next");next.innerHTML="&#8250;";
+    vp.appendChild(prev);vp.appendChild(next);
+    function upd(){var cs=grid.scrollWidth>grid.clientWidth+2;prev.style.display=cs?"":"none";next.style.display=cs?"":"none";if(cs){prev.disabled=grid.scrollLeft<=2;next.disabled=grid.scrollLeft>=(grid.scrollWidth-grid.clientWidth-2);}}
+    prev.addEventListener("click",function(){grid.scrollBy({left:-grid.clientWidth,behavior:"smooth"});});
+    next.addEventListener("click",function(){grid.scrollBy({left:grid.clientWidth,behavior:"smooth"});});
+    grid.addEventListener("scroll",upd);window.addEventListener("resize",function(){sizeCards();upd();});setTimeout(upd,60);
+  }
   function load(){
     getItems().then(function(items){
       grid.innerHTML="";
-      if(!items.length){root.style.display="none";return;}
-      items.forEach(function(p){if(p&&(p.variantId||(p.variants&&p.variants.length)))grid.appendChild(card(p));});
+      var valid=(items||[]).filter(function(p){return p&&(p.variantId||(p.variants&&p.variants.length));});
+      if(!valid.length){root.style.display="none";return;}
+      valid.forEach(function(p){grid.appendChild(card(p));});
+      bokoTrack("impression");
+      if(valid.length>4){setupCarousel();}
     });
   }
 
@@ -318,9 +298,33 @@
   "target": "section",
   "settings": [
     { "type": "text", "id": "heading", "label": "Heading", "default": "Complete the Look" },
-    { "type": "text", "id": "eyebrow", "label": "Eyebrow (defaults to product type/collection)" },
-    { "type": "range", "id": "limit", "label": "Number of recommendations", "min": 2, "max": 6, "step": 1, "default": 4 },
-    { "type": "checkbox", "id": "use_theme_fonts", "label": "Use theme fonts", "default": true }
+    { "type": "text", "id": "eyebrow", "label": "Eyebrow label", "info": "Small label above the heading. Leave blank to auto-fill with the product type or collection (e.g. \"SUNGLASSES\")." },
+    { "type": "range", "id": "limit", "label": "Number of recommendations", "min": 2, "max": 12, "step": 1, "default": 4, "info": "More than 4 automatically switches to a carousel." },
+    { "type": "header", "content": "Typography" },
+    { "type": "checkbox", "id": "use_theme_fonts", "label": "Use my theme's fonts", "default": true },
+    { "type": "select", "id": "font_family", "label": "Font family (Google Fonts)", "default": "",
+      "visible_if": "{{ block.settings.use_theme_fonts == false }}",
+      "options": [
+        { "value": "", "label": "Default (theme font)" },
+        { "value": "Roboto", "label": "Roboto" },
+        { "value": "Open Sans", "label": "Open Sans" },
+        { "value": "Lato", "label": "Lato" },
+        { "value": "Montserrat", "label": "Montserrat" },
+        { "value": "Poppins", "label": "Poppins" },
+        { "value": "Inter", "label": "Inter" },
+        { "value": "Oswald", "label": "Oswald" },
+        { "value": "Raleway", "label": "Raleway" },
+        { "value": "Nunito", "label": "Nunito" },
+        { "value": "Playfair Display", "label": "Playfair Display" },
+        { "value": "Merriweather", "label": "Merriweather" },
+        { "value": "Rubik", "label": "Rubik" },
+        { "value": "Work Sans", "label": "Work Sans" },
+        { "value": "Noto Sans", "label": "Noto Sans" },
+        { "value": "Mulish", "label": "Mulish" }
+      ]
+    },
+    { "type": "range", "id": "heading_size", "label": "Heading size", "min": 16, "max": 48, "step": 1, "unit": "px", "default": 30 },
+    { "type": "range", "id": "body_size", "label": "Product text size", "min": 11, "max": 20, "step": 1, "unit": "px", "default": 14 }
   ]
 }
 {% endschema %}
