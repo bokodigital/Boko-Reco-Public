@@ -26,12 +26,16 @@
   assign cur = product.selected_or_first_available_variant
   assign font_css = "inherit"
   assign gfont = ""
-  unless block.settings.use_theme_fonts
-    if block.settings.font_family != blank
-      assign font_css = block.settings.font_family | prepend: "'" | append: "',sans-serif"
-      assign gfont = block.settings.font_family | replace: " ", "+"
-    endif
-  endunless
+  if block.settings.font_family != blank
+    assign font_css = block.settings.font_family | prepend: "'" | append: "',sans-serif"
+    assign gfont = block.settings.font_family | replace: " ", "+"
+  endif
+  assign wpct = block.settings.width_percent | default: 100
+  if block.settings.full_width
+    assign container_css = "width:calc(100vw - var(--boko-sbw,0px));max-width:none;margin:48px 0;margin-left:calc(50% - 50vw + var(--boko-sbw,0px) / 2);margin-right:calc(50% - 50vw + var(--boko-sbw,0px) / 2);padding:0 20px"
+  else
+    assign container_css = "width:" | append: wpct | append: "%;max-width:1600px;margin:48px auto;padding:0 20px"
+  endif
 -%}
 
 {%- if product -%}
@@ -42,11 +46,12 @@
 #boko-ctl-{{ block.id }}{--ink:#1f2320;--muted:#8b8f8c;--line:#e6e6e3;--sel:#1f2320;--bg:#fff;
   --ctl-font:{{ font_css }};--ctl-body:{{ block.settings.body_size | default: 14 }}px;--ctl-head:{{ block.settings.heading_size | default: 30 }}px;
   font-family:var(--ctl-font);font-size:var(--ctl-body);
-  color:var(--ink);max-width:1360px;margin:48px auto;padding:0 20px;box-sizing:border-box}
+  color:var(--ink);{{ container_css }};box-sizing:border-box}
 #boko-ctl-{{ block.id }} *{box-sizing:border-box}
-#boko-ctl-{{ block.id }} .boko-ctl__wrap{display:grid;grid-template-columns:minmax(220px,1fr) 3.4fr;gap:36px;align-items:start}
-/* left current product */
-#boko-ctl-{{ block.id }} .boko-ctl__cimg{position:relative;aspect-ratio:3/4;overflow:hidden;background:#f4f3f0}
+#boko-ctl-{{ block.id }} .boko-ctl__wrap{display:grid;grid-template-columns:minmax(220px,1fr) 3.4fr;gap:36px;align-items:stretch}
+/* left current product — equal height with the recommendations column */
+#boko-ctl-{{ block.id }} .boko-ctl__current{display:flex;flex-direction:column}
+#boko-ctl-{{ block.id }} .boko-ctl__cimg{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;background:#f4f3f0}
 #boko-ctl-{{ block.id }} .boko-ctl__cimg img{width:100%;height:100%;object-fit:cover;display:block}
 #boko-ctl-{{ block.id }} .boko-ctl__ctitle{font-size:var(--ctl-body);letter-spacing:1.4px;text-transform:uppercase;font-weight:500;margin:16px 0 4px}
 #boko-ctl-{{ block.id }} .boko-ctl__cprice{font-size:var(--ctl-body);color:var(--ink);margin-bottom:0}
@@ -240,7 +245,7 @@
   function setupCarousel(){
     if(grid.getAttribute("data-car"))return;grid.setAttribute("data-car","1");
     grid.classList.add("boko-ctl__grid--car");
-    var per=Math.min(cols,4);
+    var per=Math.min(limit,4)||4;
     function sizeCards(){var gap=parseFloat(getComputedStyle(grid).columnGap||getComputedStyle(grid).gap)||18;var w=grid.clientWidth||root.clientWidth||window.innerWidth;var MIN=window.innerWidth<=640?150:200;var n=Math.floor((w+gap)/(MIN+gap));n=Math.max(2,Math.min(per,n||2));Array.prototype.forEach.call(grid.children,function(c){c.style.flex="0 0 calc((100% - "+((n-1)*gap)+"px) / "+n+")";});}
     sizeCards();
     var vp=document.createElement("div");vp.className="boko-ctl__vp";grid.parentNode.insertBefore(vp,grid);vp.appendChild(grid);
@@ -287,6 +292,8 @@
     addItems(items).then(function(){bundle.slice().forEach(function(id){var o=ITEMS[id];if(o&&o.c){var cb=o.c.querySelector(".boko-ctl__bundle input");if(cb)cb.checked=false;}});bundle=[];ITEMS={};renderBar();btn.textContent="Add bundle to cart";}).catch(function(){btn.textContent="Try again";});
   }
 
+  function setSbw(){try{document.documentElement.style.setProperty("--boko-sbw",(window.innerWidth-document.documentElement.clientWidth)+"px");}catch(e){}}
+  setSbw();window.addEventListener("resize",setSbw);
   load();
 })();
 </script>
@@ -300,10 +307,12 @@
     { "type": "text", "id": "heading", "label": "Heading", "default": "Complete the Look" },
     { "type": "text", "id": "eyebrow", "label": "Eyebrow label", "info": "Small label above the heading. Leave blank to auto-fill with the product type or collection (e.g. \"SUNGLASSES\")." },
     { "type": "range", "id": "limit", "label": "Number of recommendations", "min": 2, "max": 12, "step": 1, "default": 4, "info": "More than 4 automatically switches to a carousel." },
+    { "type": "header", "content": "Width" },
+    { "type": "checkbox", "id": "full_width", "label": "Full-width section (edge to edge)", "default": false },
+    { "type": "range", "id": "width_percent", "label": "Section width", "min": 40, "max": 100, "step": 5, "unit": "%", "default": 100, "info": "Used when full-width is off." },
     { "type": "header", "content": "Typography" },
-    { "type": "checkbox", "id": "use_theme_fonts", "label": "Use my theme's fonts", "default": true },
     { "type": "select", "id": "font_family", "label": "Font family (Google Fonts)", "default": "",
-      "visible_if": "{{ block.settings.use_theme_fonts == false }}",
+      "info": "Leave as Default to use your theme font.",
       "options": [
         { "value": "", "label": "Default (theme font)" },
         { "value": "Roboto", "label": "Roboto" },
