@@ -19,6 +19,9 @@
     assign eyebrow = product.collections.first.title
   endif
   assign limit = block.settings.limit | default: 4
+  if limit > 5
+    assign limit = 5
+  endif
   assign cols = limit
   if cols > 4
     assign cols = 4
@@ -113,11 +116,21 @@
   #boko-ctl-{{ block.id }} .boko-ctl__grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:640px){
-  #boko-ctl-{{ block.id }} .boko-ctl__current{grid-template-columns:1fr}
-  #boko-ctl-{{ block.id }} .boko-ctl__grid{grid-auto-flow:column;grid-auto-columns:74%;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none;margin:0 -20px;padding:0 20px}
-  #boko-ctl-{{ block.id }} .boko-ctl__grid::-webkit-scrollbar{display:none}
-  #boko-ctl-{{ block.id }} .boko-ctl__card{scroll-snap-align:start}
+  #boko-ctl-{{ block.id }} .boko-ctl__wrap{gap:22px}
+  #boko-ctl-{{ block.id }} .boko-ctl__current{display:block}
+  #boko-ctl-{{ block.id }} .boko-ctl__cimg{min-height:0;aspect-ratio:3/4;max-height:70vh}
+  #boko-ctl-{{ block.id }} .boko-ctl__heading{margin-bottom:16px}
+  #boko-ctl-{{ block.id }} .boko-ctl__vp{margin:0 -16px;padding:0}
+  #boko-ctl-{{ block.id }} .boko-ctl__grid,#boko-ctl-{{ block.id }} .boko-ctl__grid--car{display:grid !important;grid-auto-flow:column;grid-auto-columns:82%;grid-template-columns:none;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none;margin:0;padding:0 16px 4px}
+  #boko-ctl-{{ block.id }} .boko-ctl__grid::-webkit-scrollbar,#boko-ctl-{{ block.id }} .boko-ctl__grid--car::-webkit-scrollbar{display:none}
+  #boko-ctl-{{ block.id }} .boko-ctl__card{scroll-snap-align:start;flex:none !important}
+  #boko-ctl-{{ block.id }} .boko-ctl__cnav{display:none !important}
   #boko-ctl-{{ block.id }} .boko-ctl__add{opacity:1;transform:none}
+  #boko-ctl-{{ block.id }} .boko-ctl__bar{padding:10px 14px;gap:8px 12px}
+  #boko-ctl-{{ block.id }} .boko-ctl__bsp{display:none}
+  #boko-ctl-{{ block.id }} .boko-ctl__btot{order:4}
+  #boko-ctl-{{ block.id }} .boko-ctl__bclear{order:5}
+  #boko-ctl-{{ block.id }} .boko-ctl__badd{flex:1 1 100%;order:6;padding:14px}
 }
 </style>
 
@@ -268,7 +281,7 @@
       if(!valid.length){root.style.display="none";return;}
       valid.forEach(function(p){grid.appendChild(card(p));});
       bokoTrack("impression");
-      if(valid.length>4){setupCarousel();}
+      if(valid.length>4 && window.innerWidth>640){setupCarousel();}
     });
   }
 
@@ -310,7 +323,7 @@
   "settings": [
     { "type": "text", "id": "heading", "label": "Heading", "default": "Complete the Look" },
     { "type": "text", "id": "eyebrow", "label": "Eyebrow label", "info": "Small label above the heading. Leave blank to auto-fill with the product type or collection (e.g. \"SUNGLASSES\")." },
-    { "type": "range", "id": "limit", "label": "Number of recommendations", "min": 2, "max": 12, "step": 1, "default": 4, "info": "More than 4 automatically switches to a carousel." },
+    { "type": "range", "id": "limit", "label": "Number of recommendations", "min": 2, "max": 5, "step": 1, "default": 4, "info": "More than 4 automatically switches to a carousel." },
     { "type": "header", "content": "Width" },
     { "type": "checkbox", "id": "full_width", "label": "Full-width section (edge to edge)", "default": false },
     { "type": "range", "id": "width_percent", "label": "Section width", "min": 40, "max": 100, "step": 5, "unit": "%", "default": 100, "info": "Used when full-width is off." },
