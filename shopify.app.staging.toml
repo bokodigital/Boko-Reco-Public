@@ -1,0 +1,26 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "9dc4534abd42d4707bf699cc2d4cb73f"
+name = "Boko Reco — Staging"
+application_url = "https://boko-reco-staging.replit.app/"
+embedded = true
+
+[app_proxy]
+url = "https://boko-reco-staging.replit.app/proxy"
+subpath = "reco"
+prefix = "apps"
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_discounts,read_orders,read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://boko-reco-staging.replit.app/auth/callback",
+  "https://boko-reco-staging.replit.app/auth/callback/"
+]
