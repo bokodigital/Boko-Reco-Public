@@ -134,7 +134,7 @@ export function mountKlaviyo(app, deps) {
     try {
       const shop = String(req.query.shop || "");
       const st = shop ? await kvGet("bkl_status:" + shop) : null;
-      res.json({ ok: true, db: !!db(), status: st });
+      res.json({ ok: true, db: true, status: st });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
     }
