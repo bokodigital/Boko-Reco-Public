@@ -984,7 +984,7 @@ document.getElementById("tabBtnCz").addEventListener("click",function(){showTab(
  var g=document.getElementById('czGrid');
  if(g&&window.MutationObserver){var mo=new MutationObserver(function(){if(g.querySelector('.cz-card'))build();});mo.observe(g,{childList:true});}
 })();
-</script>${klaviyoScript()}</body></html>`;
+</script><script>${klaviyoScript()}</script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
