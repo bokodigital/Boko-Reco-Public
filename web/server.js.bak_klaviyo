@@ -20,13 +20,6 @@ import express from "express";
 import crypto from "crypto";
 import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
-import { mountKlaviyo } from "./boko-klaviyo.js"; // BOKO KLAVIYO
-import { mountKlaviyoFeeds } from "./boko-klaviyo-feeds.js";
-import { mountKlaviyoImpact, klaviyoCardHtml, klaviyoScript } from "./boko-klaviyo-card.js";
-import { mountKlaviyoSync } from "./boko-klaviyo-sync.js";
-import { mountKlaviyoSettings, klvSettingsCardHtml } from "./boko-klaviyo-settings.js";
-import { mountKlaviyoAttrib } from "./boko-klaviyo-attrib.js";
-import { mountKlaviyoProvision } from "./boko-klaviyo-provision.js";
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
 import { SFY_SECTION_LIQUID, SFY_PAGE_TEMPLATE } from "./theme-assets.js";
@@ -186,20 +179,6 @@ async function billingOK(shop, token) {
 }
 
 const app = express();
-// ---- BOKO KLAVIYO MODULE (additive; per-store email recommendations) ----
-function bokoComplementaryPool(products, category, anchorId) {
-  const cat = String(category || "").toLowerCase();
-  return (products || []).filter(function (p) {
-    return String(p.id) !== String(anchorId) && String(p.category || "").toLowerCase() !== cat && p.available !== false;
-  });
-}
-mountKlaviyo(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
-mountKlaviyoFeeds(app);
-mountKlaviyoImpact(app, { shopFromToken: shopFromSessionToken });
-mountKlaviyoSync(app, { getToken, gql });
-mountKlaviyoSettings(app, { shopFromToken: shopFromSessionToken });
-mountKlaviyoAttrib(app, { getToken, gql });
-mountKlaviyoProvision(app);
 // Raw body only for webhooks (needed for HMAC); JSON for everything else.
 app.use("/webhooks", express.raw({ type: "*/*" }));
 app.use(express.json());
@@ -722,7 +701,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <p class="sub">Set the design for all your recommendation widgets, and choose collections to always exclude.</p>
 <div id="czErr"></div>
 <div class="cz-grid" id="czGrid"></div>
-${klaviyoCardHtml()}${klvSettingsCardHtml()}<div class="cz-global">
+<div class="cz-global">
   <h3>Excluded collections</h3>
   <p class="sub" style="margin:0">Products in these collections never appear in any recommendation widget.</p>
   <div class="cz-multiselect" id="czCollections"></div>
@@ -984,7 +963,7 @@ document.getElementById("tabBtnCz").addEventListener("click",function(){showTab(
  var g=document.getElementById('czGrid');
  if(g&&window.MutationObserver){var mo=new MutationObserver(function(){if(g.querySelector('.cz-card'))build();});mo.observe(g,{childList:true});}
 })();
-</script>${klaviyoScript()}</body></html>`;
+</script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
