@@ -27,8 +27,6 @@ import { mountKlaviyoSync } from "./boko-klaviyo-sync.js";
 import { mountKlaviyoSettings, klvSettingsCardHtml } from "./boko-klaviyo-settings.js";
 import { mountKlaviyoAttrib } from "./boko-klaviyo-attrib.js";
 import { mountKlaviyoProvision } from "./boko-klaviyo-provision.js";
-import { mountImpact, impactCardHtml, impactScript } from "./boko-impact.js"; // BOKO IMPACT - AOV Improvement card
-import { mountCr, crCardHtml, crScript } from "./boko-cr.js"; // BOKO CR - Conversion Lift card
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
 import { SFY_SECTION_LIQUID, SFY_PAGE_TEMPLATE } from "./theme-assets.js";
@@ -202,8 +200,6 @@ mountKlaviyoSync(app, { getToken, gql });
 mountKlaviyoSettings(app, { shopFromToken: shopFromSessionToken });
 mountKlaviyoAttrib(app, { getToken, gql });
 mountKlaviyoProvision(app);
-mountImpact(app, { shopFromToken: shopFromSessionToken, getToken, tokenExchange, gql, apiSecret: API_SECRET, host: HOST, api: API }); // BOKO IMPACT
-mountCr(app, { shopFromToken: shopFromSessionToken, getToken, tokenExchange, gql, apiSecret: API_SECRET, host: HOST, api: API }); // BOKO CR
 // Raw body only for webhooks (needed for HMAC); JSON for everything else.
 app.use("/webhooks", express.raw({ type: "*/*" }));
 app.use(express.json());
@@ -726,7 +722,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <p class="sub">Set the design for all your recommendation widgets, and choose collections to always exclude.</p>
 <div id="czErr"></div>
 <div class="cz-grid" id="czGrid"></div>
-${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}<div class="cz-global">
+${klaviyoCardHtml()}${klvSettingsCardHtml()}<div class="cz-global">
   <h3>Excluded collections</h3>
   <p class="sub" style="margin:0">Products in these collections never appear in any recommendation widget.</p>
   <div class="cz-multiselect" id="czCollections"></div>
@@ -988,7 +984,7 @@ document.getElementById("tabBtnCz").addEventListener("click",function(){showTab(
  var g=document.getElementById('czGrid');
  if(g&&window.MutationObserver){var mo=new MutationObserver(function(){if(g.querySelector('.cz-card'))build();});mo.observe(g,{childList:true});}
 })();
-</script><script>${impactScript()}</script><script>${crScript()}</script><script>${klaviyoScript()}</script></body></html>`;
+</script><script>${klaviyoScript()}</script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
