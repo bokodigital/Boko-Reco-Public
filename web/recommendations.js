@@ -180,6 +180,18 @@ async function recommend({ products, anchor = null, limit = 8, useLLM = true }) 
     const refined = await refineWithLLM({ candidates, anchor });
     if (refined && refined.length) ordered = refined;
   }
+  // Backfill: guarantee up to `limit` items even when the LLM/pairing returned fewer.
+  if (ordered.length < limit) {
+    const seen = new Set(ordered.map((p) => p.id));
+    const topUp = (list) => {
+      for (const p of list || []) {
+        if (ordered.length >= limit) break;
+        if (p && !seen.has(p.id)) { ordered.push(p); seen.add(p.id); }
+      }
+    };
+    topUp(candidates);
+    if (ordered.length < limit) topUp(ranked);
+  }
   return ordered.slice(0, limit);
 }
 
