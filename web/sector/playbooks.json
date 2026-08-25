@@ -1,0 +1,143 @@
+{
+  "_meta": {
+    "about": "Data-driven sector playbooks for the Boko AI Recommendations engine. Each sector defines the ordered ROLES of its 'setup', the hard-gate attributes, default scoring weights, and keyword hints used to infer a product's role when a boko.role metafield is absent. Fashion is intentionally omitted — it stays on the existing generic engine. Everything here is loaded only when boko_industry:<shop> is set; otherwise the app behaves exactly as today.",
+    "version": "0.1"
+  },
+  "Beauty": {
+    "label": "Beauty",
+    "roleOrder": ["cleanse", "tone", "treat", "eye", "moisturise", "protect"],
+    "gateAttrs": ["skin_type", "time_of_day"],
+    "weights": { "role_adjacency": 40, "attribute_match": 30, "concern_match": 22, "recency": 15, "rating": 10, "price_band": 8 },
+    "roleSynonyms": {
+      "cleanse": ["cleanser", "face wash", "cleansing", "gel wash", "micellar"],
+      "tone": ["toner", "tonic", "essence"],
+      "treat": ["serum", "exfoliant", "retinol", "acid", "peel", "ampoule", "treatment"],
+      "eye": ["eye cream", "eye serum"],
+      "moisturise": ["moisturiser", "moisturizer", "cream", "lotion", "hydrator", "gel cream"],
+      "protect": ["spf", "sunscreen", "sun cream", "uv"]
+    },
+    "rules": [
+      { "when": { "timeOfDay": "AM" }, "then": "require:protect" },
+      { "when": { "timeOfDay": "PM" }, "then": "exclude:protect" },
+      { "when": { "cartHasRole": "moisturise" }, "then": "prefer:protect" },
+      { "when": { "anchorHasAttr": "spf" }, "then": "exclude:protect" }
+    ]
+  },
+  "Travel": {
+    "label": "Travel (Bags & Travel Accessories)",
+    "roleOrder": ["carry", "pack", "organise", "identify", "secure", "power", "comfort", "misc"],
+    "gateAttrs": ["is_travel", "region_available"],
+    "weights": { "role_adjacency": 38, "attribute_match": 20, "concern_match": 10, "recency": 22, "rating": 12, "price_band": 8 },
+    "roleSynonyms": {
+      "carry": ["backpack", "suitcase", "duffel", "carry-on", "weekender", "luggage"],
+      "pack": ["packing cube", "compression bag", "shoe bag"],
+      "organise": ["toiletry bag", "tech organiser", "organizer", "pouch"],
+      "identify": ["luggage tag", "tag"],
+      "secure": ["tsa lock", "strap", "travel wallet", "passport", "rfid", "lock"],
+      "power": ["adapter", "power bank", "cable", "charger"],
+      "comfort": ["neck pillow", "eye mask", "blanket"],
+      "misc": ["water bottle", "laundry bag", "scale"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "diversify:role" }
+    ]
+  },
+  "Home & Living": {
+    "label": "Home & Living (Shop the Room)",
+    "roleOrder": ["anchor", "support", "lighting", "storage", "textiles", "decor"],
+    "gateAttrs": ["style", "colour_palette", "indoor_outdoor", "scale"],
+    "weights": { "role_adjacency": 30, "attribute_match": 40, "concern_match": 6, "recency": 12, "rating": 8, "price_band": 10 },
+    "roleSynonyms": {
+      "anchor": ["sofa", "bed", "dining table", "desk", "tv unit", "console"],
+      "support": ["coffee table", "side table", "chair", "nightstand", "dresser", "sideboard", "bench"],
+      "lighting": ["lamp", "floor lamp", "pendant", "chandelier", "sconce"],
+      "storage": ["shelf", "bookshelf", "cabinet", "wardrobe", "filing", "sideboard"],
+      "textiles": ["rug", "cushion", "curtain", "throw", "bedding", "runner"],
+      "decor": ["wall art", "vase", "plant", "mirror", "candle", "bowl", "tray"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "gate:scale_before_style" },
+      { "when": { "anchorHasAttr": "indoor_outdoor" }, "then": "gate:indoor_outdoor_match" },
+      { "when": { "role": "decor" }, "then": "order:last" }
+    ]
+  },
+  "Electronics": {
+    "label": "Electronics",
+    "roleOrder": ["protect", "power", "connect", "peripheral", "audio", "storage", "mount", "care", "consumable"],
+    "gateAttrs": ["model_family", "connector", "os", "voltage", "region", "fit_size"],
+    "weights": { "role_adjacency": 30, "attribute_match": 46, "concern_match": 4, "recency": 12, "rating": 10, "price_band": 6 },
+    "roleSynonyms": {
+      "protect": ["case", "screen protector", "sleeve", "bumper", "cover"],
+      "power": ["charger", "cable", "power bank", "adapter"],
+      "connect": ["hub", "dongle", "dock"],
+      "peripheral": ["mouse", "keyboard", "controller", "stylus", "lens"],
+      "audio": ["earbuds", "headphones", "speaker", "headset"],
+      "storage": ["sd card", "ssd", "memory", "storage"],
+      "mount": ["stand", "mount", "tripod", "dock"],
+      "care": ["cleaning kit", "protection plan", "warranty"],
+      "consumable": ["ink", "battery", "filament", "toner", "paper"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "hardgate:compatibility" },
+      { "when": { "deviceType": "phone" }, "then": "first:protect,power" },
+      { "when": { "anchorHasAttr": "in_box_charger" }, "then": "prefer:protect" }
+    ]
+  },
+  "Food & Beverage": {
+    "label": "Food & Beverage",
+    "roleOrder": ["main", "pairing", "tool", "accompaniment", "gift", "refill"],
+    "gateAttrs": ["dietary_flags", "allergens", "handling", "age_restricted", "region_rules"],
+    "weights": { "role_adjacency": 28, "attribute_match": 34, "concern_match": 18, "recency": 10, "rating": 12, "price_band": 6 },
+    "roleSynonyms": {
+      "main": ["coffee", "wine", "pasta", "tea", "gin", "cereal", "chocolate", "olive oil"],
+      "pairing": ["cheese", "cracker", "charcuterie", "tonic", "sauce", "parmesan"],
+      "tool": ["filter", "grinder", "infuser", "frother", "shaker", "glassware", "mug"],
+      "accompaniment": ["honey", "biscuit", "milk", "fruit", "bread", "garnish", "dukkah"],
+      "gift": ["hamper", "gift box", "flowers"],
+      "refill": ["value pack", "bulk", "subscription", "refill"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "hardgate:dietary" },
+      { "when": { "anchorIsConsumable": true }, "then": "surface:refill" },
+      { "when": { "anchorHasAttr": "age_restricted" }, "then": "gate:region_rules" }
+    ]
+  },
+  "Jewellery": {
+    "label": "Jewellery & Accessories",
+    "roleOrder": ["necklace", "earrings", "bracelet", "ring", "watch", "care", "gift"],
+    "gateAttrs": ["metal", "style", "occasion", "price_tier"],
+    "weights": { "role_adjacency": 30, "attribute_match": 42, "concern_match": 6, "recency": 12, "rating": 8, "price_band": 10 },
+    "roleSynonyms": {
+      "necklace": ["necklace", "pendant", "chain"],
+      "earrings": ["earrings", "studs", "hoops", "drops"],
+      "bracelet": ["bracelet", "bangle", "cuff", "anklet"],
+      "ring": ["ring", "band", "stacking ring"],
+      "watch": ["watch", "strap"],
+      "care": ["cleaning cloth", "jewellery box", "care kit"],
+      "gift": ["gift box", "packaging", "card"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "hardgate:metal_unless_mixed" },
+      { "when": { "always": true }, "then": "gate:style_occasion_match" },
+      { "when": { "giftSignal": true }, "then": "add:gift,care" }
+    ]
+  },
+  "Others": {
+    "label": "Others (generic fallback framework)",
+    "roleOrder": ["core", "companion", "protection", "accessory", "consumable", "upgrade"],
+    "gateAttrs": ["compatibility_key", "region_available"],
+    "weights": { "role_adjacency": 34, "attribute_match": 24, "concern_match": 8, "recency": 18, "rating": 12, "price_band": 8 },
+    "roleSynonyms": {
+      "core": ["tent", "bike", "dog bed", "cot", "mat", "guitar"],
+      "companion": ["sleeping bag", "helmet", "dog food", "mattress", "blocks", "case"],
+      "protection": ["cover", "lock", "flea", "bumper", "guard"],
+      "accessory": ["stove", "toy", "light", "mobile", "strap", "pump"],
+      "consumable": ["gas canister", "treats", "chain oil", "nappies", "strings"],
+      "upgrade": ["premium", "upgrade", "pro", "deluxe"]
+    },
+    "rules": [
+      { "when": { "always": true }, "then": "hardgate:compatibility_key" },
+      { "when": { "anchorIsConsumable": true }, "then": "surface:refill" }
+    ]
+  }
+}

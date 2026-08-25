@@ -29,6 +29,8 @@ import { mountKlaviyoAttrib } from "./boko-klaviyo-attrib.js";
 import { mountKlaviyoProvision } from "./boko-klaviyo-provision.js";
 import { mountImpact, impactCardHtml, impactScript } from "./boko-impact.js"; // BOKO IMPACT - AOV Improvement card
 import { mountCr, crCardHtml, crScript } from "./boko-cr.js"; // BOKO CR - Conversion Lift card
+import { recommendForShop } from "./sector/engine.js";
+import { toEngineProduct, BOKO_METAFIELD_FRAGMENT } from "./sector/loader.js";
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
 import { SFY_SECTION_LIQUID, SFY_PAGE_TEMPLATE } from "./theme-assets.js";
@@ -38,7 +40,7 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 const API_KEY = process.env.SHOPIFY_API_KEY || "";
 const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
 const SCOPES = process.env.SCOPES || "read_orders,read_products,write_discounts";
-const HOST = (process.env.HOST || "").replace(/\/+$/, "");
+const HOST = ((process.env.HOST || "").replace(/^(?!https?:\/\/)/,"https://")).replace(/\/+$/, "");
 const API = process.env.SHOPIFY_API_VERSION || "2024-10";
 const db = new Database();
 
@@ -215,6 +217,8 @@ app.get("/auth", (req, res) => {
   if (!validShop(shop)) return res.status(400).send("Missing or invalid ?shop");
   const redirectUri = HOST + "/auth/callback";
   const state = crypto.randomBytes(16).toString("hex");
+  // Persist the state nonce so we can verify it in the callback (CSRF protection).
+  db.set("oauth_state:" + shop, { state, ts: Date.now() }).catch(() => {});
   const url = `https://${shop}/admin/oauth/authorize?client_id=${API_KEY}` +
     `&scope=${encodeURIComponent(SCOPES)}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
   res.redirect(url);
@@ -230,6 +234,15 @@ app.get("/auth/callback", async (req, res) => {
     const message = Object.keys(params).sort().map((key) => `${key}=${params[key]}`).join("&");
     const digest = crypto.createHmac("sha256", API_SECRET).update(message).digest("hex");
     if (digest !== hmac) return res.status(400).send("HMAC validation failed");
+    // Verify the state nonce we issued at /auth (CSRF protection).
+    let savedState = await db.get("oauth_state:" + shop);
+    if (savedState && typeof savedState === "object" && "ok" in savedState) savedState = savedState.ok ? savedState.value : null;
+    const expectedState = savedState && savedState.state;
+    const stateFresh = savedState && savedState.ts && (Date.now() - savedState.ts) < 3600000;
+    if (!req.query.state || !expectedState || req.query.state !== expectedState || !stateFresh) {
+      return res.status(400).send("State validation failed");
+    }
+    db.delete("oauth_state:" + shop).catch(() => {});
     // Exchange the code for a permanent access token
     const tok = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -298,10 +311,10 @@ function verifyProxy(query) {
   catch (e) { return false; }
 }
 
-async function loadProducts(shop, token, limit = 100, productType = "") {
+async function loadProducts(shop, token, limit = 100, productType = "", includeBoko = false) {
   const safe = productType.replace(/[^a-zA-Z0-9 &-]/g, "");
   const qstr = safe ? `status:active product_type:${safe}` : "status:active";
-  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } } } } } }`;
+  const query = `query($n:Int!){ products(first:$n, sortKey: PUBLISHED_AT, reverse: true, query:"${qstr}"){ edges{ node{ id title handle productType vendor tags publishedAt createdAt isGiftCard featuredImage{url} options{ name values } collections(first:20){ edges{ node{ id handle } } } variants(first:100){ edges{ node{ id title price availableForSale selectedOptions{ name value } } } }${includeBoko ? " " + BOKO_METAFIELD_FRAGMENT : ""} } } } }`;
   const j = await gql(shop, token, query, { n: limit });
   const edges = (j.data && j.data.products && j.data.products.edges) || [];
   const results = [];
@@ -333,9 +346,11 @@ async function loadProducts(shop, token, limit = 100, productType = "") {
     if (!v || !v.availableForSale) continue;
     results.push({ id: n.id, handle: n.handle, variantId: v.id, available: true,
       title: n.title, vendor: n.vendor, tags: n.tags || [], category: (n.productType || "").toLowerCase(),
+      productType: n.productType || "",
       price: parseFloat(v.price), img: (n.featuredImage && n.featuredImage.url) || "",
-      orders: Math.max(0, limit - i) * 3, views: 0, options, variants,
+      orders: 0, views: 0, options, variants,
       collectionGids: collGids,
+      bokoMf: (n.metafields && n.metafields.edges) || [],
       createdAt: n.publishedAt || n.createdAt || null });
   }
   results.collectionsIndex = collectionsIndex;
@@ -353,7 +368,11 @@ app.get("/proxy/recommend", async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit || "8", 10), 24);
     const atype = (req.query.atype || "").trim();
     const anum = (req.query.anchor || "").trim();
-    let products = await loadProducts(shop, token, 250);
+    // Multi-sector: is this shop opted into a sector playbook? If so, fetch boko.*
+    // metafields alongside products so the sector engine has attributes to work with.
+    let industry = null;
+    try { const ri = await db.get("boko_industry:" + shop); industry = (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) {}
+    let products = await loadProducts(shop, token, 250, "", !!industry);
     const settings = await loadSettings(shop);
     const excludeHandles = String(req.query.exclude || "").split(",").map((s) => s.trim()).filter(Boolean);
     const excludeGids = handlesToCollectionGids(excludeHandles, products.collectionsIndex || {});
@@ -368,7 +387,20 @@ app.get("/proxy/recommend", async (req, res) => {
       price: parseFloat(req.query.aprice || "0") || 0,
     } : null);
     if (anum) products = products.filter((p) => !p.id.endsWith(anum));
-    const items = await recommend({ products, anchor, limit });
+    let items;
+    if (industry) {
+      // ---- sector-aware path (dormant unless the shop set a business category) ----
+      const eng = products.map((p) => toEngineProduct(p, p.bokoMf || []));
+      const engAnchor = found ? toEngineProduct(found, found.bokoMf || []) : anchor;
+      const cartNums = String(req.query.cart || "").split(",").map((s) => s.trim()).filter(Boolean);
+      const cart = cartNums.length ? eng.filter((p) => cartNums.some((c) => String(p.id).endsWith(c))) : [];
+      const tod = (req.query.tod || req.query.timeOfDay || "").trim();
+      const giftSignal = /^(1|true|yes)$/i.test(String(req.query.gift || ""));
+      const picks = await recommendForShop({ products: eng, anchor: engAnchor, cart, industry, limit, timeOfDay: tod, giftSignal });
+      items = picks.map(({ bokoMf, attrs, ...rest }) => rest); // drop internal fields from the payload
+    } else {
+      items = await recommend({ products, anchor, limit });
+    }
     res.status(200).send(JSON.stringify({ items }));
   } catch (e) {
     res.status(200).send(JSON.stringify({ items: [], error: e.message }));
@@ -548,6 +580,16 @@ app.post("/settings", express.json(), async (req, res) => {
     const shop = shopFromSessionToken(idToken);
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
     const merged = await saveSettings(shop, req.body || {});
+    // Multi-sector: mirror the chosen business category into the industry flag the
+    // sector engine reads. Fashion (and unset) clears it -> the base engine runs.
+    try {
+      if (req.body && req.body.global && typeof req.body.global.category === "string") {
+        const CAT2IND = { "Beauty": "Beauty", "Travel": "Travel", "Home & Living": "Home & Living", "Electronics": "Electronics", "Food & Beverage": "Food & Beverage", "Jewellery & Accessories": "Jewellery", "Other": "Others" };
+        const ind = CAT2IND[req.body.global.category] || null;
+        if (ind) await db.set("boko_industry:" + shop, ind);
+        else await db.delete("boko_industry:" + shop).catch(() => {});
+      }
+    } catch (e) { console.error("industry flag sync:", e && e.message); }
       try { if (req.body && req.body.global && req.body.global.bundle) { const _st = await shopAndTokenFromRequest(req); if (_st && _st.token) { const _br = await ensureBundleDiscount(shop, _st.token, (merged.global && merged.global.bundle) || {}); if (_br && _br.error) console.error("bundle sync:", _br.error); } } } catch (e) { console.error("bundle sync failed:", e && e.message); }
     res.status(200).send(JSON.stringify({ settings: merged }));
   } catch (e) {
@@ -648,7 +690,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <h1>Boko AI Recommendations</h1>
 <div class="tabs">
   <button class="tab-btn active" id="tabBtnPerf" type="button">Performance</button>
-  <button class="tab-btn" id="tabBtnCz" type="button">Customizer</button>
+  <button class="tab-btn" id="tabBtnCz" type="button">Settings</button>
   <button class="tab-btn" id="tabBtnInstall" type="button">Installation guide</button>
 </div>
 <div id="tab-performance">
@@ -661,7 +703,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <div class="hero"><div><div class="v lime" id="revTotal">–</div><div class="x">total revenue from recommendations</div></div>
 <div style="margin-left:auto"><div class="v" id="itemTotal">–</div><div class="x">items purchased</div></div></div>
 <div class="cards">
-  <div class="card"><span class="pill">Product page rail</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
+  <div class="card"><span class="pill">Complete the Look</span><div class="big" id="pdpTotal">–</div><div class="rev" id="pdpRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="pdpRows"></tbody></table></div>
   <div class="card"><span class="pill">Cart drawer carousel</span><div class="big" id="cdTotal">–</div><div class="rev" id="cdRev"></div>
     <table><thead><tr><th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Revenue</th></tr></thead><tbody id="cdRows"></tbody></table></div>
@@ -716,22 +758,55 @@ input:disabled+.slider{opacity:.5;cursor:default}
     <div style="font-weight:400;color:var(--muted);margin-top:4px">The page is now live in your store navigation for shoppers to browse.</div>
   </li>
   <li><strong>Step 5 &mdash; Style all the recommendations</strong>
-    <div style="font-weight:400;color:var(--muted);margin-top:4px">Open the <strong>Customizer</strong> tab above to set fonts, sizes and the bundle discount. These apply to all three widgets at once.</div>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">Open the <strong>Settings</strong> tab above to choose your category, exclude collections, and set fonts, sizes and the bundle discount. These apply to all three widgets at once.</div>
   </li>
 </ol>
 </div>
 </details>
 </div>
 <div id="tab-customizer" style="display:none">
-<p class="sub">Set the design for all your recommendation widgets, and choose collections to always exclude.</p>
+<p class="sub">Choose your business category, exclude any collections you don't want recommended, then style the widgets.</p>
 <div id="czErr"></div>
+
+<div class="cz-global" id="czCategoryCard">
+  <h3>Choose category <span style="color:#d33">*</span></h3>
+  <p class="sub" style="margin:0 0 12px">Select your business category. This is required — recommendations are tailored to your industry, so choose one before setting anything else.</p>
+  <div class="cz-field" style="max-width:380px;margin:0">
+    <label>Business category</label>
+    <select id="cz-category" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;padding:10px 12px;border:1px solid #E6E7EB;border-radius:10px;background:#fff;color:#0B0B0B">
+      <option value="">Select a category…</option>
+      <option value="Fashion">Fashion</option>
+      <option value="Beauty">Beauty</option>
+      <option value="Travel">Travel</option>
+      <option value="Home & Living">Home &amp; Living</option>
+      <option value="Electronics">Electronics</option>
+      <option value="Food & Beverage">Food &amp; Beverage</option>
+      <option value="Jewellery & Accessories">Jewellery &amp; Accessories</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+  <div id="czCatNote" class="sub" style="margin:10px 0 0;color:#b45309;font-weight:600"></div>
+</div>
 <div class="cz-grid" id="czGrid"></div>
 ${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}<div class="cz-global">
   <h3>Excluded collections</h3>
   <p class="sub" style="margin:0">Products in these collections never appear in any recommendation widget.</p>
   <div class="cz-multiselect" id="czCollections"></div>
 </div>
-<div class="cz-save"><button id="czSaveBtn" type="button">Save changes</button><span class="cz-status" id="czStatus"></span></div>
+
+<div id="czGated">
+  <div class="cz-global">
+    <h3>Exclude categories</h3>
+    <p class="sub" style="margin:0 0 10px">Products in these collections never appear in any recommendation widget.</p>
+    <div class="cz-multiselect" id="czCollections"></div>
+  </div>
+  <div style="margin-top:20px">
+    <h3 style="font-weight:700;font-size:16px;margin:0 0 12px">Design customizer</h3>
+    <div class="cz-grid" id="czGrid"></div>
+  </div>
+</div>
+
+<div class="cz-save"><button id="czSaveBtn" type="button" disabled>Save changes</button><span class="cz-status" id="czStatus"></span></div>
 </div>
 <script>
 var CUR="";
@@ -770,7 +845,7 @@ function load(){
 }
 document.getElementById("days").addEventListener("change",load); load();
 
-var CZ_COMPONENTS=[["rail","Product page rail"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
+var CZ_COMPONENTS=[["rail","Complete the Look"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
 var czState=null, czCollections=[], czLoaded=false;
 function czField(comp,key,label,type,extra){
   extra=extra||"";
@@ -779,7 +854,7 @@ function czField(comp,key,label,type,extra){
 function renderCzGrid(){
   var fonts=["Roboto","Open Sans","Lato","Montserrat","Poppins","Inter","Oswald","Raleway","Nunito","Playfair Display","Merriweather","Rubik","Work Sans","Noto Sans","Mulish"];
   var opts="<option value=''>Default (theme font)</option>"+fonts.map(function(f){return "<option value='"+f+"'>"+f+"</option>";}).join("");
-  var html="<div class='cz-design'><h3>Design</h3><p class='sub' style='margin:0 0 16px'>These styles apply to all three recommendation widgets: Product Rail, Cart Drawer and Selected For You.</p>"
+  var html="<div class='cz-design'><h3>Design</h3><p class='sub' style='margin:0 0 16px'>These styles apply to all three recommendation widgets: Complete the Look, Cart Drawer and Selected For You.</p>"
    +"<div class='cz-field'><label>Font family</label><select id='cz-fontFamily'>"+opts+"</select></div>"
    +"<div class='cz-row2'><div class='cz-field'><label>Heading font size (px)</label><input id='cz-headingSize' type='number' min='10' max='60'></div><div class='cz-field'><label>Subtitle font size (px)</label><input id='cz-subtitleSize' type='number' min='8' max='40'></div></div>"
    +"<div class='cz-row2'><div class='cz-field'><label>Product title font size (px)</label><input id='cz-titleSize' type='number' min='8' max='40'></div><div class='cz-field'></div></div>"
@@ -796,6 +871,27 @@ function fillCzForm(settings){
   setv("cz-titleSize",d.titleSize||14);
   setv("cz-buttonColor",d.buttonColor||"#0B0B0B");
   setv("cz-buttonTextColor",d.buttonTextColor||"#FFFFFF");var b=(settings&&settings.global&&settings.global.bundle)||{};var be=document.getElementById("cz-bundleEnabled");if(be)be.checked=!!b.enabled;setv("cz-bundlePct",b.percentage||10);setv("cz-bundleMin",b.minItems||2);
+  setv("cz-category",(settings&&settings.global&&settings.global.category)||"");
+}
+var bkNeedsCategory=false;
+function bkBanner(on){
+  var b=document.getElementById("bkCatBanner");
+  if(!b){ b=document.createElement("div"); b.id="bkCatBanner"; b.style.cssText="background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;margin:0 0 18px"; b.textContent="Choose your business category in Settings to start using the app."; var tabs=document.querySelector(".tabs"); if(tabs&&tabs.parentNode){tabs.parentNode.insertBefore(b,tabs.nextSibling);} }
+  b.style.display=on?"":"none";
+}
+function applyCatGate(){
+  var sel=document.getElementById("cz-category");var cat=sel?sel.value:"";
+  var gated=document.getElementById("czGated");var save=document.getElementById("czSaveBtn");var note=document.getElementById("czCatNote");
+  if(cat){ if(gated){gated.style.opacity="";gated.style.pointerEvents="";} if(save)save.disabled=false; if(note)note.textContent=""; }
+  else { if(gated){gated.style.opacity=".45";gated.style.pointerEvents="none";} if(save)save.disabled=true; if(note)note.textContent="Please select a business category to continue."; }
+  bkNeedsCategory=!cat; bkBanner(!cat);
+}
+function bkInitGate(){
+  authedFetch("/settings").then(function(d){
+    var cat=d&&d.settings&&d.settings.global&&d.settings.global.category;
+    bkNeedsCategory=!cat;
+    if(bkNeedsCategory){ bkBanner(true); showTab("cz"); }
+  }).catch(function(){});
 }
 function renderCzCollections(collections,excluded){
   var ex=new Set(excluded||[]);
@@ -810,6 +906,7 @@ function collectCzForm(){
   function gv(id,dv){var el=document.getElementById(id);var v=el?(""+el.value).trim():"";return v||dv;}
   var out={global:{excludedCollections:[],design:{fontFamily:gv("cz-fontFamily",""),headingSize:parseInt(gv("cz-headingSize","20"),10)||20,subtitleSize:parseInt(gv("cz-subtitleSize","14"),10)||14,titleSize:parseInt(gv("cz-titleSize","14"),10)||14,buttonColor:gv("cz-buttonColor","#0B0B0B"),buttonTextColor:gv("cz-buttonTextColor","#FFFFFF")}}};
   Array.prototype.forEach.call(document.querySelectorAll(".cz-chip.on"),function(chip){out.global.excludedCollections.push(chip.getAttribute("data-gid"));});var bce=document.getElementById("cz-bundleEnabled");out.global.bundle={enabled:bce?!!bce.checked:false,percentage:parseInt(gv("cz-bundlePct","10"),10)||10,minItems:parseInt(gv("cz-bundleMin","2"),10)||2};
+  var _cat=document.getElementById("cz-category");out.global.category=_cat?_cat.value:"";
   return out;
 }
 function loadCustomizer(){
@@ -820,6 +917,8 @@ function loadCustomizer(){
     czState=d.settings; czCollections=d.collections||[];
     fillCzForm(czState);
     renderCzCollections(czCollections,czState.global&&czState.global.excludedCollections);
+    var _catSel=document.getElementById("cz-category");if(_catSel)_catSel.addEventListener("change",applyCatGate);
+    applyCatGate();
     czLoaded=true;
   }).catch(function(){ document.getElementById("czErr").innerHTML="<div class='err'>Couldn't load settings.</div>"; });
 }
@@ -838,6 +937,7 @@ document.getElementById("czSaveBtn").addEventListener("click",function(){
   })();
 });
 function showTab(name){
+  if(bkNeedsCategory && name!=="cz"){ name="cz"; var _n=document.getElementById("czCatNote"); if(_n)_n.textContent="Please choose a business category first — the app is locked until you do."; bkBanner(true); }
   document.getElementById("tab-performance").style.display=(name==="perf")?"":"none";
   document.getElementById("tab-customizer").style.display=(name==="cz")?"":"none";
   document.getElementById("tab-installation").style.display=(name==="install")?"":"none";
@@ -849,6 +949,7 @@ function showTab(name){
 document.getElementById("tabBtnPerf").addEventListener("click",function(){showTab("perf");});
 document.getElementById("tabBtnCz").addEventListener("click",function(){showTab("cz");});
  document.getElementById("tabBtnInstall").addEventListener("click",function(){showTab("install");});
+bkInitGate();
 
 /* Boko dashboard enhancer v2 — on-brand two-pane customizer. Purely additive. */
 (function(){
@@ -889,6 +990,7 @@ document.getElementById("tabBtnCz").addEventListener("click",function(){showTab(
  +".cz-save{position:sticky;bottom:0;display:flex;align-items:center;gap:14px;margin-top:18px;padding:14px 0;background:linear-gradient(180deg,rgba(248,249,252,0),"+LILAC+" 45%);}"
  +"#czSaveBtn,.sf-row button{font-family:inherit;font-weight:700;font-size:14px;background:"+LIME+";color:"+INK+";border:0;border-radius:10px;padding:11px 22px;cursor:pointer;}"
  +"#czSaveBtn:hover,.sf-row button:hover{filter:brightness(.93);}"
+ +"#czSaveBtn:disabled{background:#E6E7EB;color:#9AA0AA;cursor:not-allowed;filter:none;}"
  +".sf-card{background:#fff;border:1px solid "+LINE+";border-radius:16px;padding:22px;margin-bottom:16px;}"
  +".hero{border-radius:16px;}.cards .card{border-radius:16px;}";
  var st=document.getElementById('bk-style')||document.createElement('style');st.id='bk-style';st.textContent=css;if(!st.parentNode)document.head.appendChild(st);
@@ -913,7 +1015,7 @@ document.getElementById("tabBtnCz").addEventListener("click",function(){showTab(
  function money(n,cur){try{return new Intl.NumberFormat(undefined,{style:'currency',currency:cur||'USD',currencyDisplay:'code',maximumFractionDigits:0}).format(n||0);}catch(e){return (cur||'')+' '+Math.round(Number(n||0));}}
  function pct(a,b){if(!b)return '0%';return Math.round((a/b)*100)+'%';}
  function W(v,mx){var p=mx>0?Math.round((v/mx)*100):0;if(v>0&&p<4)p=4;return p;}
- var COMPS=[{name:'Selected For You',stat:'sfy_page',fk:['sfy','page','sfy_page','selected-for-you','selected-for-you-page']},{name:'Product Rail (PDP)',stat:'pdp',fk:['pdp','rail','product_rail']},{name:'Cart Drawer',stat:'cart_drawer',fk:['cart','cart_drawer','cart-drawer']}];
+ var COMPS=[{name:'Complete the Look',stat:'pdp',fk:['pdp','rail','product_rail','ctl','complete_look','complete-the-look']},{name:'Selected For You',stat:'sfy_page',fk:['sfy','page','sfy_page','selected-for-you','selected-for-you-page']},{name:'Cart Drawer',stat:'cart_drawer',fk:['cart','cart_drawer','cart-drawer']}];
  function fv(funnel,keys,ev){var t=0;for(var i=0;i<keys.length;i++){var b=funnel[keys[i]];if(b&&b[ev])t+=b[ev];}return t;}
  function render(funnel,stats){
   funnel=funnel||{};stats=stats||{};

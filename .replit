@@ -1,9 +1,9 @@
 run = "cd web && npm install && npm start"
 entrypoint = "web/server.js"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "web", "python-3.12"]
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-25_05"
 
 [env]
 SCOPES = "read_products,read_orders"
