@@ -293,5 +293,24 @@ async function assemble({ products, anchor, cart, playbook, limit, useLLM, weigh
       round++;
     }
   }
+  // Final top-up: if still short of `limit`, pad from the best remaining
+  // catalogue items (ranked, cross-category) so the configured count is honoured.
+  if (result.length < limit) {
+    try {
+      const rec = await import('../recommendations.js');
+      const ranked = (rec.rankHeuristic ? rec.rankHeuristic('recommended', products, anchor) : []) || [];
+      const seen2 = new Set(result.map((p) => p.id));
+      if (anchor) seen2.add(anchor.id);
+      const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : '';
+      for (const p of ranked) {
+        if (result.length >= limit) break;
+        if (!p || seen2.has(p.id)) continue;
+        if (cartIds && cartIds.has && cartIds.has(p.id)) continue;
+        const pcat = p.category ? String(p.category).toLowerCase() : '';
+        if (aCat && pcat === aCat) continue;
+        result.push(p); seen2.add(p.id);
+      }
+    } catch (e) { /* keep what we have */ }
+  }
   return result.slice(0, limit);
 }
