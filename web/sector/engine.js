@@ -274,10 +274,24 @@ async function assemble({ products, anchor, cart, playbook, limit, useLLM, weigh
     } catch (e) { /* keep heuristic order */ }
   }
 
-  // NOTE: sector mode is complements-only and one-per-role, so the set can be
-  // shorter than `limit` when few roles are fillable. We deliberately do NOT pad
-  // it with the base engine, which would reintroduce same-role or off-setup items
-  // and break the hard gates. (Backfilling with second-best complements is a
-  // future tuning option, gated the same way.)
+  // Backfill up to `limit` with next-best complements per role (round-robin).
+  // These already passed the same compatibility gates and scoring, so the
+  // configured recommendation count is honoured without weakening hard gates.
+  if (result.length < limit) {
+    const seen = new Set(result.map((p) => p.id));
+    const roleArrs = priority.map((r) => byRole.get(r)).filter(Boolean);
+    let round = 0, addedAny = true;
+    while (result.length < limit && addedAny) {
+      addedAny = false;
+      for (const arr of roleArrs) {
+        if (result.length >= limit) break;
+        if (round < arr.length) {
+          const cand = arr[round].p;
+          if (!seen.has(cand.id)) { result.push(cand); seen.add(cand.id); addedAny = true; }
+        }
+      }
+      round++;
+    }
+  }
   return result.slice(0, limit);
 }
