@@ -274,10 +274,43 @@ async function assemble({ products, anchor, cart, playbook, limit, useLLM, weigh
     } catch (e) { /* keep heuristic order */ }
   }
 
-  // NOTE: sector mode is complements-only and one-per-role, so the set can be
-  // shorter than `limit` when few roles are fillable. We deliberately do NOT pad
-  // it with the base engine, which would reintroduce same-role or off-setup items
-  // and break the hard gates. (Backfilling with second-best complements is a
-  // future tuning option, gated the same way.)
+  // Backfill up to `limit` with next-best complements per role (round-robin).
+  // These already passed the same compatibility gates and scoring, so the
+  // configured recommendation count is honoured without weakening hard gates.
+  if (result.length < limit) {
+    const seen = new Set(result.map((p) => p.id));
+    const roleArrs = priority.map((r) => byRole.get(r)).filter(Boolean);
+    let round = 0, addedAny = true;
+    while (result.length < limit && addedAny) {
+      addedAny = false;
+      for (const arr of roleArrs) {
+        if (result.length >= limit) break;
+        if (round < arr.length) {
+          const cand = arr[round].p;
+          if (!seen.has(cand.id)) { result.push(cand); seen.add(cand.id); addedAny = true; }
+        }
+      }
+      round++;
+    }
+  }
+  // Final top-up: if still short of `limit`, pad from the best remaining
+  // catalogue items (ranked, cross-category) so the configured count is honoured.
+  if (result.length < limit) {
+    try {
+      const rec = await import('../recommendations.js');
+      const ranked = (rec.rankHeuristic ? rec.rankHeuristic('recommended', products, anchor) : []) || [];
+      const seen2 = new Set(result.map((p) => p.id));
+      if (anchor) seen2.add(anchor.id);
+      const aCat = anchor && anchor.category ? String(anchor.category).toLowerCase() : '';
+      for (const p of ranked) {
+        if (result.length >= limit) break;
+        if (!p || seen2.has(p.id)) continue;
+        if (cartIds && cartIds.has && cartIds.has(p.id)) continue;
+        const pcat = p.category ? String(p.category).toLowerCase() : '';
+        if (aCat && pcat === aCat) continue;
+        result.push(p); seen2.add(p.id);
+      }
+    } catch (e) { /* keep what we have */ }
+  }
   return result.slice(0, limit);
 }
