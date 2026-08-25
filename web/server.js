@@ -786,17 +786,11 @@ input:disabled+.slider{opacity:.5;cursor:default}
     </select>
   </div>
   <div id="czCatNote" class="sub" style="margin:10px 0 0;color:#b45309;font-weight:600"></div>
-</div>
-<div class="cz-grid" id="czGrid"></div>
-${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}<div class="cz-global">
-  <h3>Excluded collections</h3>
-  <p class="sub" style="margin:0">Products in these collections never appear in any recommendation widget.</p>
-  <div class="cz-multiselect" id="czCollections"></div>
-</div>
-
-<div id="czGated">
+        </div>
+        ${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}
+        <div id="czGated">
   <div class="cz-global">
-    <h3>Exclude categories</h3>
+    <h3>Excluded collections</h3>
     <p class="sub" style="margin:0 0 10px">Products in these collections never appear in any recommendation widget.</p>
     <div class="cz-multiselect" id="czCollections"></div>
   </div>
