@@ -716,8 +716,16 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <summary>Installation guide <span class="chev">&#9658;</span></summary>
 <div class="how-to__body">
 <ol class="how-to__list">
-  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It shows shoppers products they are likely to want &mdash; a "You may also like" or "Complete the look row" on product pages, a carousel inside the cart, and a "Selected For You" page. Follow the steps below to switch each one on. You can reopen this guide any time from <strong>Apps &rarr; AI Recommendations</strong>.</div></li>
-  <li><strong>Step 1 &mdash; Show recommendations on product pages</strong>
+  <li><strong>What this app does</strong><div style="font-weight:400;color:var(--muted);margin-top:4px">It shows shoppers products they are likely to want, tailored to your <strong>business category</strong> &mdash; a <strong>Complete the Look</strong> row on product pages, a carousel inside the cart, and a <strong>Selected For You</strong> page. It can also power <strong>Klaviyo email recommendations</strong>, and it tracks <strong>Conversion Lift</strong> and <strong>AOV Improvement</strong> on your dashboard. Follow the steps below to switch each one on. You can reopen this guide any time from <strong>Apps &rarr; AI Recommendations</strong>.</div></li>
+  <li><strong>Step 1 &mdash; Choose your business category (required)</strong>
+    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
+      <li>Open the <strong>Settings</strong> tab above.</li>
+      <li>Under <strong>Choose category</strong>, pick the category that best fits your store (Fashion, Beauty, Electronics, Jewellery &amp; Accessories, and more).</li>
+      <li>Click <strong>Save changes</strong>.</li>
+    </ol>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">This is required &mdash; recommendations are tailored to your industry, and the rest of the settings stay locked until a category is chosen.</div>
+  </li>
+  <li><strong>Step 2 &mdash; Show recommendations on product pages</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>In your Shopify admin, open <strong>Online Store &rarr; Themes</strong>.</li>
       <li>On your live theme, click <strong>Customize</strong>.</li>
@@ -728,7 +736,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
     </ol>
     <div style="font-weight:400;color:var(--muted);margin-top:4px">Shoppers now see a recommendations row on every product page.</div>
   </li>
-  <li><strong>Step 2 &mdash; Show recommendations in the cart</strong>
+  <li><strong>Step 3 &mdash; Show recommendations in the cart</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>In the theme editor, click the <strong>App embeds</strong> icon in the far-left toolbar.</li>
       <li>Turn on <strong>Cart recommendations</strong>.</li>
@@ -736,7 +744,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
     </ol>
     <div style="font-weight:400;color:var(--muted);margin-top:4px">A recommendations carousel now appears inside the cart drawer.</div>
   </li>
-  <li><strong>Step 3 &mdash; Create the "Selected For You" page</strong>
+  <li><strong>Step 4 &mdash; Create the "Selected For You" page</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>Go to <strong>Online Store &rarr; Pages</strong> and click <strong>Add page</strong>.</li>
       <li>Title it <strong>Selected For You</strong>, leave the content empty, and click <strong>Save</strong>.</li>
@@ -746,7 +754,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
       <li>Click <strong>Save</strong>.</li>
     </ol>
   </li>
-  <li><strong>Step 4 &mdash; Add the page to your menu</strong>
+  <li><strong>Step 5 &mdash; Add the page to your menu</strong>
     <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
       <li>Go to <strong>Online Store &rarr; Navigation</strong>.</li>
       <li>Click the menu you want it in (usually <strong>Main menu</strong>).</li>
@@ -757,8 +765,16 @@ input:disabled+.slider{opacity:.5;cursor:default}
     </ol>
     <div style="font-weight:400;color:var(--muted);margin-top:4px">The page is now live in your store navigation for shoppers to browse.</div>
   </li>
-  <li><strong>Step 5 &mdash; Style all the recommendations</strong>
-    <div style="font-weight:400;color:var(--muted);margin-top:4px">Open the <strong>Settings</strong> tab above to choose your category, exclude collections, and set fonts, sizes and the bundle discount. These apply to all three widgets at once.</div>
+  <li><strong>Step 6 &mdash; Style all the recommendations</strong>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">In the <strong>Settings</strong> tab, exclude any collections you don't want recommended and set fonts, sizes, colours and the bundle discount. These apply to all three widgets at once.</div>
+  </li>
+  <li><strong>Step 7 &mdash; Connect Klaviyo for email recommendations (optional)</strong>
+    <ol style="margin:6px 0 0;padding-left:20px;line-height:1.7;font-weight:400">
+      <li>In Klaviyo, go to <strong>Settings &rarr; API keys</strong> and <strong>Create Private API Key</strong> (Full Access).</li>
+      <li>Back in this app, find <strong>Klaviyo Settings</strong> and paste the key (starts with <span class="how-to__code">pk_</span>).</li>
+      <li>Click <strong>Connect</strong>.</li>
+    </ol>
+    <div style="font-weight:400;color:var(--muted);margin-top:4px">This enables nightly profile sync, tracked product links and click events so you can add AI recommendations to your Klaviyo emails. The key is stored securely for this store only and never shown again.</div>
   </li>
 </ol>
 </div>
