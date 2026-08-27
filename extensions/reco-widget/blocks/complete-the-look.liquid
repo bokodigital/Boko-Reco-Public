@@ -1,14 +1,3 @@
-{% comment %}
-  Boko — Complete the Look (product page)
-  A NEW, standalone product-page section. Left: the product being viewed
-  (image, title, price, options, quantity, Add to Cart). Right: AI recommendations
-  from the SAME engine as the existing widget, via the App Proxy /apps/reco/recommend.
-  It does not change or depend on the existing "AI Recommendations" section.
-
-  Install: Online Store → Themes → Edit code → Sections → Add "boko-complete-the-look"
-  → paste this file → Save → Customize a product template → Add section → "Complete the Look".
-{% endcomment %}
-
 {%- liquid
   assign heading = block.settings.heading | default: 'Complete the Look'
   assign eyebrow = block.settings.eyebrow
@@ -175,16 +164,7 @@
   /* ---------- Conversion Lift session beacon (App Impact) ----------
      Feeds /apps/reco/cr with pdp/imp events + a visitor/session id, and sets the
      _boko_vid cart attribute so orders can be joined back to the session. */
-  function bokoCk(n){try{var m=document.cookie.match("(?:^|; )"+n+"=([^;]*)");return m?decodeURIComponent(m[1]):"";}catch(e){return "";}}
-  function bokoSk(n,v,secs){try{document.cookie=n+"="+encodeURIComponent(v)+";path=/;max-age="+secs+";SameSite=Lax";}catch(e){}}
-  function bokoUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,10);}
-  function bokoCR(e){try{
-    var vid=bokoCk("_boko_vid");if(!vid){vid=bokoUid();bokoSk("_boko_vid",vid,31536000);}
-    var sid=bokoCk("_boko_sid");if(!sid){sid=bokoUid();}bokoSk("_boko_sid",sid,1800);
-    var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/cr")+"?e="+e+"&sid="+encodeURIComponent(sid)+"&vid="+encodeURIComponent(vid);
-    if(navigator.sendBeacon){navigator.sendBeacon(u);}else{fetch(u,{method:"GET",keepalive:true});}
-  }catch(e){}}
-  function bokoCRAttr(){try{if(bokoCk("_boko_va"))return;var vid=bokoCk("_boko_vid");if(!vid)return;fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({attributes:{_boko_vid:vid}})}).then(function(){bokoSk("_boko_va","1",1800);}).catch(function(){});}catch(e){}}
+  {%- render 'boko-cr-beacon' -%}
   try{if(!window.__bokoCRpdp){window.__bokoCRpdp=1;bokoCR("pdp");bokoCRAttr();}}catch(e){}
 
   function money(n){return "$"+Number(n).toFixed(2);}

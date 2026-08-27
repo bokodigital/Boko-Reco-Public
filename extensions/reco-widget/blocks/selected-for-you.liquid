@@ -1,8 +1,3 @@
-{% comment %}
-  Boko AI — Selected For You page block.
-  Personalised product grid with Browse-by-collection bar.
-  Add as an app block to any page or product template in the theme editor.
-{% endcomment %}
 {%- liquid
   assign h_font = block.settings.heading_font
   assign b_font  = block.settings.body_font
@@ -340,16 +335,7 @@
     var grid=root.querySelector("[data-sfy-grid]");
     grid.style.setProperty("--sfy-cols",cols);
     var activeTab=null;
-  function bokoCk(n){try{var m=document.cookie.match("(?:^|; )"+n+"=([^;]*)");return m?decodeURIComponent(m[1]):"";}catch(e){return "";}}
-  function bokoSk(n,v,secs){try{document.cookie=n+"="+encodeURIComponent(v)+";path=/;max-age="+secs+";SameSite=Lax";}catch(e){}}
-  function bokoUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,10);}
-  function bokoCR(e){try{
-    var vid=bokoCk("_boko_vid");if(!vid){vid=bokoUid();bokoSk("_boko_vid",vid,31536000);}
-    var sid=bokoCk("_boko_sid");if(!sid){sid=bokoUid();}bokoSk("_boko_sid",sid,1800);
-    var u=String(proxy||"/apps/reco/recommend").replace(/\/recommend\/?$/,"/cr")+"?e="+e+"&sid="+encodeURIComponent(sid)+"&vid="+encodeURIComponent(vid);
-    if(navigator.sendBeacon){navigator.sendBeacon(u);}else{fetch(u,{method:"GET",keepalive:true});}
-  }catch(e){}}
-  function bokoCRAttr(){try{if(bokoCk("_boko_va"))return;var vid=bokoCk("_boko_vid");if(!vid)return;fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({attributes:{_boko_vid:vid}})}).then(function(){bokoSk("_boko_va","1",1800);}).catch(function(){});}catch(e){}}
+  {%- render 'boko-cr-beacon' -%}
     function setLoading(){grid.innerHTML="<div class='sfy-loading'>Loading…</div>";}
     function showEmpty(){grid.innerHTML="<div class='sfy-loading'>No products found.</div>";}
     function renderProducts(products){
