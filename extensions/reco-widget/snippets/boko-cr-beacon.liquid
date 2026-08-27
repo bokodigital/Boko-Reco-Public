@@ -1,3 +1,4 @@
+
 function bokoCk(n){try{var m=document.cookie.match("(?:^|; )"+n+"=([^;]*)");return m?decodeURIComponent(m[1]):"";}catch(e){return "";}}
   function bokoSk(n,v,secs){try{document.cookie=n+"="+encodeURIComponent(v)+";path=/;max-age="+secs+";SameSite=Lax";}catch(e){}}
   function bokoUid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,10);}

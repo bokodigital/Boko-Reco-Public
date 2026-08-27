@@ -335,7 +335,7 @@
     var grid=root.querySelector("[data-sfy-grid]");
     grid.style.setProperty("--sfy-cols",cols);
     var activeTab=null;
-  {%- render 'boko-cr-beacon' -%}
+  {% render 'boko-cr-beacon' %}
     function setLoading(){grid.innerHTML="<div class='sfy-loading'>Loading…</div>";}
     function showEmpty(){grid.innerHTML="<div class='sfy-loading'>No products found.</div>";}
     function renderProducts(products){

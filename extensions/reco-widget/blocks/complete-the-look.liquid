@@ -164,7 +164,7 @@
   /* ---------- Conversion Lift session beacon (App Impact) ----------
      Feeds /apps/reco/cr with pdp/imp events + a visitor/session id, and sets the
      _boko_vid cart attribute so orders can be joined back to the session. */
-  {%- render 'boko-cr-beacon' -%}
+  {% render 'boko-cr-beacon' %}
   try{if(!window.__bokoCRpdp){window.__bokoCRpdp=1;bokoCR("pdp");bokoCRAttr();}}catch(e){}
 
   function money(n){return "$"+Number(n).toFixed(2);}

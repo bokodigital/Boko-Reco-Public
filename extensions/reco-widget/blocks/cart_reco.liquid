@@ -80,7 +80,7 @@
     var autoplay=parseInt(root.getAttribute("data-autoplay")||"0",10);
     var slides=root.querySelector("[data-slides]"), dots=root.querySelector("[data-dots]");
     var items=[], idx=0, timer=null, cartIds={}, busy=false;
-  {%- render 'boko-cr-beacon' -%}
+  {% render 'boko-cr-beacon' %}
     function go(i){ if(!items.length)return; idx=(i+items.length)%items.length; slides.style.transform="translateX("+(-idx*100)+"%)"; dots.querySelectorAll(".bcc-dot").forEach(function(d,k){d.classList.toggle("on",k===idx);}); }
     function stop(){ if(timer){clearInterval(timer);timer=null;} }
     function start(){ stop(); if(autoplay>0 && items.length>1){ timer=setInterval(function(){go(idx+1);}, autoplay*1000); } }
