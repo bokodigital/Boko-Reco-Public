@@ -307,6 +307,7 @@ export function mountCr(app, deps) {
         meta.hook = true;
         await dbSet(metaKey(shop), meta);
       }
+      if (!meta.bf) { try { await crBackfill(shop, token, deps, 90); } catch (e) {} meta.bf = true; await dbSet(metaKey(shop), meta); }
       const range = Math.min(365, Math.max(1, parseInt(req.query.range || "30", 10)));
       res.status(200).send(JSON.stringify(await computeCr(shop, range)));
     } catch (e) { res.status(200).send(JSON.stringify({ error: e.message })); }
