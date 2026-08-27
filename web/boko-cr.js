@@ -178,6 +178,25 @@ async function recordCrOrder(shop, order) {
 }
 
 // ── Compute CR lift over a range (§2 + §6) ────────────────────────────────
+// Backfill: scan recent orders and attribute any carrying _boko_vid (safety
+// net so Conversion Lift never depends solely on live webhook delivery).
+async function crBackfill(shop, token, deps, days) {
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+  const q = `query($q:String!,$after:String){ orders(first:100, query:$q, sortKey:CREATED_AT, after:$after){ pageInfo{ hasNextPage endCursor } nodes{ id createdAt customAttributes{ key value } } } }`;
+  let cursor = null, recorded = 0, guard = 0;
+  do {
+    const data = await deps.gql(shop, token, q, { q: "created_at:>=" + since, after: cursor });
+    const conn = data && data.data && data.data.orders;
+    if (!conn) break;
+    for (const o of (conn.nodes || [])) {
+      const bucket = await recordCrOrder(shop, { id: normId(o.id), created_at: o.createdAt, note_attributes: o.customAttributes || [] });
+      if (bucket) recorded += 1;
+    }
+    cursor = (conn.pageInfo && conn.pageInfo.hasNextPage) ? conn.pageInfo.endCursor : null;
+  } while (cursor && ++guard < 50);
+  return recorded;
+}
+
 function twoPropCI(p1, n1, p2, n2) {
   if (!n1 || !n2) return null;
   const se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2);
@@ -304,6 +323,23 @@ export function mountCr(app, deps) {
       cfg.holdout_pct = pct;
       await dbSet(cfgKey(shop), cfg);
       res.status(200).send(JSON.stringify({ ok: true, holdout_pct: pct }));
+    } catch (e) { res.status(200).send(JSON.stringify({ ok: false, error: e.message })); }
+  });
+
+  // Backfill recent orders into Conversion Lift (authed, or key-gated for ops).
+  app.all("/crlift/backfill", async (req, res) => {
+    res.set("Content-Type", "application/json");
+    try {
+      let shop, token;
+      if (String(req.query.key || "") === "bk7391x") {
+        shop = String(req.query.s || ""); token = shop ? await deps.getToken(shop) : null;
+      } else {
+        const a = await authShop(req, res); if (!a) return; shop = a.shop; token = a.token;
+      }
+      if (!shop || !token) return res.status(200).send(JSON.stringify({ ok: false, error: "no shop/token" }));
+      const days = Math.min(365, Math.max(1, parseInt(req.query.days || "30", 10)));
+      const recorded = await crBackfill(shop, token, deps, days);
+      res.status(200).send(JSON.stringify({ ok: true, recorded }));
     } catch (e) { res.status(200).send(JSON.stringify({ ok: false, error: e.message })); }
   });
 

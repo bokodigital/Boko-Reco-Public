@@ -381,6 +381,7 @@ export function mountImpact(app, deps) {
       const shop = req.get("X-Shopify-Shop-Domain");
       const order = JSON.parse(Buffer.isBuffer(req.body) ? req.body.toString("utf8") : String(req.body || "{}"));
       await recordOrder(shop, parseWebhookOrder(order));
+      try { await _bokoCr.recordCrOrder(shop, order); } catch (e) {} // Conversion Lift attribution (idempotent)
       res.status(200).send("ok");
     } catch (e) { res.status(200).send("ok"); }
   });
@@ -393,6 +394,7 @@ export const __test = {
 };
 
 import crypto from "crypto";
+import { __test as _bokoCr } from "./boko-cr.js"; // Conversion Lift rides this working orders/create webhook
 function cryptoHmac(secret, rawBuf) {
   return crypto.createHmac("sha256", secret || "").update(rawBuf || Buffer.from("")).digest("base64");
 }
