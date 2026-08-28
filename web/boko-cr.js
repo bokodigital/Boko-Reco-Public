@@ -182,18 +182,18 @@ async function recordCrOrder(shop, order) {
 // net so Conversion Lift never depends solely on live webhook delivery).
 async function crBackfill(shop, token, deps, days) {
   const since = new Date(Date.now() - days * 864e5).toISOString();
-  const q = `query($q:String!,$after:String){ orders(first:100, query:$q, sortKey:CREATED_AT, after:$after){ pageInfo{ hasNextPage endCursor } nodes{ id createdAt customAttributes{ key value } } } }`;
-  let cursor = null, recorded = 0, guard = 0;
-  do {
-    const data = await deps.gql(shop, token, q, { q: "created_at:>=" + since, after: cursor });
-    const conn = data && data.data && data.data.orders;
-    if (!conn) break;
-    for (const o of (conn.nodes || [])) {
-      const bucket = await recordCrOrder(shop, { id: normId(o.id), created_at: o.createdAt, note_attributes: o.customAttributes || [] });
+  const ver = deps.api || "2024-10";
+  const base = "https://" + shop + "/admin/api/" + ver + "/orders.json";
+  const qs = "status=any&limit=250&created_at_min=" + encodeURIComponent(since) + "&fields=id,created_at,note_attributes";
+  let recorded = 0;
+  try {
+    const r = await fetch(base + "?" + qs, { headers: { "X-Shopify-Access-Token": token } });
+    const j = await r.json();
+    for (const o of (j.orders || [])) {
+      const bucket = await recordCrOrder(shop, { id: normId(o.id), created_at: o.created_at, note_attributes: o.note_attributes || [] });
       if (bucket) recorded += 1;
     }
-    cursor = (conn.pageInfo && conn.pageInfo.hasNextPage) ? conn.pageInfo.endCursor : null;
-  } while (cursor && ++guard < 50);
+  } catch (e) {}
   return recorded;
 }
 
@@ -307,7 +307,7 @@ export function mountCr(app, deps) {
         meta.hook = true;
         await dbSet(metaKey(shop), meta);
       }
-      if (!meta.bf) { try { await crBackfill(shop, token, deps, 90); } catch (e) {} meta.bf = true; await dbSet(metaKey(shop), meta); }
+      if (!meta.bf2) { try { await crBackfill(shop, token, deps, 90); } catch (e) {} meta.bf2 = true; await dbSet(metaKey(shop), meta); }
       const range = Math.min(365, Math.max(1, parseInt(req.query.range || "30", 10)));
       res.status(200).send(JSON.stringify(await computeCr(shop, range)));
     } catch (e) { res.status(200).send(JSON.stringify({ error: e.message })); }
