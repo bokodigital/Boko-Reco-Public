@@ -180,20 +180,28 @@ async function recordCrOrder(shop, order) {
 // ── Compute CR lift over a range (§2 + §6) ────────────────────────────────
 // Backfill: scan recent orders and attribute any carrying _boko_vid (safety
 // net so Conversion Lift never depends solely on live webhook delivery).
+let _crDbg = {};
 async function crBackfill(shop, token, deps, days) {
   const since = new Date(Date.now() - days * 864e5).toISOString();
   const ver = deps.api || "2024-10";
   const base = "https://" + shop + "/admin/api/" + ver + "/orders.json";
   const qs = "status=any&limit=250&created_at_min=" + encodeURIComponent(since) + "&fields=id,created_at,note_attributes";
-  let recorded = 0;
+  let recorded = 0, fetched = 0, withVid = 0, err = null, status = 0;
   try {
     const r = await fetch(base + "?" + qs, { headers: { "X-Shopify-Access-Token": token } });
+    status = r.status;
     const j = await r.json();
-    for (const o of (j.orders || [])) {
-      const bucket = await recordCrOrder(shop, { id: normId(o.id), created_at: o.created_at, note_attributes: o.note_attributes || [] });
+    const orders = j.orders || [];
+    fetched = orders.length;
+    for (const o of orders) {
+      const na = o.note_attributes || [];
+      if (na.some(function(a){return (a && a.name) === "_boko_vid";})) withVid += 1;
+      const bucket = await recordCrOrder(shop, { id: normId(o.id), created_at: o.created_at, note_attributes: na });
       if (bucket) recorded += 1;
     }
-  } catch (e) {}
+    if (!fetched) err = JSON.stringify(j).slice(0, 300);
+  } catch (e) { err = String(e); }
+  _crDbg = { ver: ver, status: status, fetched: fetched, withVid: withVid, recorded: recorded, err: err };
   return recorded;
 }
 
@@ -340,7 +348,7 @@ export function mountCr(app, deps) {
       if (!shop || !token) return res.status(200).send(JSON.stringify({ ok: false, error: "no shop/token" }));
       const days = Math.min(365, Math.max(1, parseInt(req.query.days || "30", 10)));
       const recorded = await crBackfill(shop, token, deps, days);
-      res.status(200).send(JSON.stringify({ ok: true, recorded }));
+      res.status(200).send(JSON.stringify({ ok: true, recorded, dbg: _crDbg }));
     } catch (e) { res.status(200).send(JSON.stringify({ ok: false, error: e.message })); }
   });
 
