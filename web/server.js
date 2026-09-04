@@ -22,6 +22,7 @@ import Database from "@replit/database";
 import { recommend } from "./recommendations.js";
 import { mountKlaviyo } from "./boko-klaviyo.js"; // BOKO KLAVIYO
 import { mountKlaviyoFeeds } from "./boko-klaviyo-feeds.js";
+import { mountKlaviyoCtlFeed } from "./boko-klaviyo-feed.js";
 import { mountKlaviyoImpact, klaviyoCardHtml, klaviyoScript } from "./boko-klaviyo-card.js";
 import { mountKlaviyoSync } from "./boko-klaviyo-sync.js";
 import { mountKlaviyoSettings, klvSettingsCardHtml } from "./boko-klaviyo-settings.js";
@@ -199,6 +200,7 @@ function bokoComplementaryPool(products, category, anchorId) {
 }
 mountKlaviyo(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
 mountKlaviyoFeeds(app);
+mountKlaviyoCtlFeed(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
 mountKlaviyoImpact(app, { shopFromToken: shopFromSessionToken });
 mountKlaviyoSync(app, { getToken, gql });
 mountKlaviyoSettings(app, { shopFromToken: shopFromSessionToken });
