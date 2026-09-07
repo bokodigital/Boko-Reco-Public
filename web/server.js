@@ -200,7 +200,7 @@ function bokoComplementaryPool(products, category, anchorId) {
 }
 mountKlaviyo(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
 mountKlaviyoFeeds(app);
-mountKlaviyoCtlFeed(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
+mountKlaviyoCtlFeed(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool, recommendForShop, toEngineProduct, getIndustry: async (s) => { try { const ri = await db.get("boko_industry:" + s); return (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) { return null; } } });
 mountKlaviyoImpact(app, { shopFromToken: shopFromSessionToken });
 mountKlaviyoSync(app, { getToken, gql });
 mountKlaviyoSettings(app, { shopFromToken: shopFromSessionToken });

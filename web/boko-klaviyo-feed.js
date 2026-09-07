@@ -51,23 +51,46 @@ export function mountKlaviyoCtlFeed(app, deps) {
   const loadProducts = deps && deps.loadProducts;
   const recommend = deps && deps.recommend;
   const complementaryPool = deps && deps.complementaryPool;
+  const recommendForShop = deps && deps.recommendForShop;
+  const toEngineProduct = deps && deps.toEngineProduct;
+  const getIndustry = deps && deps.getIndustry;
+
+  function normItem(p) {
+    return { id: numId(p.id), title: p.title || "", price: p.price || "", image: p.img || p.image || "", handle: p.handle || "" };
+  }
+  function anchorOut(a) {
+    return { id: numId(a.id), title: a.title || "", price: a.price || "", image: a.img || a.image || "", handle: a.handle || "" };
+  }
 
   async function computeLive(shop, productId, limit) {
-    if (!getToken || !loadProducts || !recommend || !complementaryPool) return null;
+    if (!getToken || !loadProducts) return null;
     const token = await getToken(shop);
     if (!token) return null;
-    const products = await loadProducts(shop, token, 250); // already filtered to in-stock/active
+    let industry = null;
+    if (getIndustry) { try { industry = await getIndustry(shop); } catch (e) {} }
+    const products = await loadProducts(shop, token, 250, "", !!industry);
     if (!products || !products.length) return null;
     const anchor = products.find((p) => numId(p.id) === numId(productId));
     if (!anchor) return null;
+
+    // Sector-aware path: identical business-category logic to the storefront widget.
+    if (industry && recommendForShop && toEngineProduct) {
+      try {
+        const eng = products.map((p) => toEngineProduct(p, p.bokoMf || []));
+        const engAnchor = toEngineProduct(anchor, anchor.bokoMf || []);
+        const picks = await recommendForShop({ products: eng, anchor: engAnchor, cart: [], industry, limit, useLLM: false });
+        const clean = (picks || []).map(normItem);
+        if (clean.length) return { anchor: anchorOut(anchor), items: clean.slice(0, limit), algo: "ctl-live-sector" };
+      } catch (e) { /* fall back to generic complement below */ }
+    }
+
+    // Fallback: generic complementary pool + base recommend (no category set).
+    if (!recommend || !complementaryPool) return null;
     const pool = complementaryPool(products, anchor.category, numId(anchor.id)) || [];
     if (!pool.length) return null;
     const picks = await recommend({ products: pool, anchor: null, limit, useLLM: false });
     if (!picks || !picks.length) return null;
-    return {
-      anchor: { id: numId(anchor.id), title: anchor.title, price: anchor.price, image: anchor.image, handle: anchor.handle },
-      items: picks.slice(0, limit), algo: "ctl-live",
-    };
+    return { anchor: anchorOut(anchor), items: picks.map(normItem).slice(0, limit), algo: "ctl-live" };
   }
 
   app.get("/feeds/:shop/ctl-live.json", async (req, res) => {
