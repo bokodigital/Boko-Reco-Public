@@ -1150,6 +1150,10 @@ app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
   const frameShop = validShop(shop) ? shop : "*.myshopify.com";
   res.set("Content-Security-Policy", "frame-ancestors https://" + frameShop + " https://admin.shopify.com");
+  // The embedded dashboard HTML contains the current controls and inline
+  // scripts. Do not let Shopify's iframe or the browser reuse an older
+  // dashboard build after a server-only publish.
+  res.set("Cache-Control", "no-store, max-age=0");
   const ab = '<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js" data-api-key="' + API_KEY + '"></script>';
   res.set("Content-Type", "text/html").status(200).send(DASHBOARD.replace("__APP_BRIDGE__", ab));
 });
