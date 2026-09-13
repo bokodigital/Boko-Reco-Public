@@ -186,10 +186,14 @@ async function ensureWebhook(shop, token, deps, meta) {
 
 // ── LIVE compute: scan Shopify orders for the range and build the payload ──
 // Same query, attribution and price math as backfillChunk/loadStats.
-async function computeImpactLive(shop, token, deps, rangeDays) {
+async function computeImpactLive(shop, token, deps, rangeDays, fromISO, toISO) {
   const cfg = (await dbGet(cfgKey(shop))) || {};
   const k = typeof cfg.k === "number" ? cfg.k : DEFAULT_K;
-  const since = new Date(Date.now() - rangeDays * 864e5).toISOString();
+  const useRange = !!(fromISO && toISO);
+  const since = useRange ? (fromISO + "T00:00:00Z") : new Date(Date.now() - rangeDays * 864e5).toISOString();
+  const until = useRange ? (toISO + "T23:59:59Z") : null;
+  const spanDays = useRange ? (Math.floor((new Date(toISO + "T00:00:00Z") - new Date(fromISO + "T00:00:00Z")) / 864e5) + 1) : rangeDays;
+  const qfilter = "created_at:>=" + since + (until ? (" created_at:<=" + until) : "");
   const q = `query($q:String!,$after:String){ orders(first:100, query:$q, sortKey:CREATED_AT, after:$after){
       edges{ cursor node{ id createdAt
         subtotalPriceSet{ shopMoney{ amount } } totalPriceSet{ shopMoney{ amount } }
@@ -200,7 +204,7 @@ async function computeImpactLive(shop, token, deps, rangeDays) {
       pageInfo{ hasNextPage endCursor } } }`;
   let cursor = null, pages = 0, orders = 0, revenue = 0, influenced = 0, attributed = 0, go = true;
   while (go && pages < 60) {
-    const data = await deps.gql(shop, token, q, { q: "created_at:>=" + since, after: cursor });
+    const data = await deps.gql(shop, token, q, { q: qfilter, after: cursor });
     const conn = data && data.data && data.data.orders;
     if (!conn) break;
     for (const edge of (conn.edges || [])) {
@@ -231,7 +235,7 @@ async function computeImpactLive(shop, token, deps, rangeDays) {
   const aovWithout = orders ? baseline / orders : 0;
   const upliftPct = baseline > 0 ? (attributed / baseline) * 100 : 0;
   return {
-    range_days: rangeDays,
+    range_days: spanDays,
     k,
     live: true,
     enough_data: orders >= MIN_ORDERS,
@@ -320,12 +324,17 @@ export function mountImpact(app, deps) {
       const { shop, token } = a;
       if (!token) return res.status(200).send(JSON.stringify({ error: "not installed" }));
       const range = Math.min(365, Math.max(1, parseInt(req.query.range || "30", 10)));
-      const ck = sh(shop) + ":" + range;
+      const fromQ = String(req.query.from || "").slice(0, 10);
+      const toQ = String(req.query.to || "").slice(0, 10);
+      const useRange = /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ);
+      const ck = sh(shop) + ":" + (useRange ? (fromQ + "_" + toQ) : range);
       const hit = LIVE_CACHE[ck];
       if (hit && Date.now() - hit.t < 120000) {
         return res.status(200).send(JSON.stringify(hit.data));
       }
-      const payload = await computeImpactLive(shop, token, deps, range);
+      const payload = useRange
+        ? await computeImpactLive(shop, token, deps, range, fromQ, toQ)
+        : await computeImpactLive(shop, token, deps, range);
       LIVE_CACHE[ck] = { t: Date.now(), data: payload };
       res.status(200).send(JSON.stringify(payload));
     } catch (e) {
@@ -434,7 +443,7 @@ export function impactScript() {
     "  async function bkAuth(){var h={Accept:'application/json'};try{if(window.shopify&&shopify.idToken){h.Authorization='Bearer '+(await shopify.idToken());}}catch(e){}return h;}",
     "  async function load(){",
     "    if(hasTiles===false){ body.innerHTML='Loading…'; note.textContent=''; if(exp) exp.innerHTML=''; }",
-    "    try{ var h=await bkAuth(); var d=await fetch('/impact?range='+(sel?sel.value:'30'),{headers:h}).then(function(r){return r.json();});",
+    "    try{ var h=await bkAuth(); var qs=(window.bkImpactQS?window.bkImpactQS():('range='+(sel?sel.value:'30'))); var d=await fetch('/impact?'+qs,{headers:h}).then(function(r){return r.json();});",
     "      if(d.error==='not installed'){body.innerHTML='Connect the app to see impact.';return;}",
     "      if(d.error){body.innerHTML='Could not load impact ('+d.error+').';return;}",
     "      if(!d.enough_data){ body.innerHTML=\"<div style='color:#8a8a8a'>Gathering data — impact shows once there are at least \"+d.min_orders+\" orders in range (\"+(d.totals?d.totals.orders:0)+\" so far).</div>\"; }",
@@ -465,6 +474,8 @@ export function impactScript() {
     "    }catch(e){ body.innerHTML='Could not load impact.'; }",
     "  }",
     "  if(sel) sel.addEventListener('change', load);",
+    "  if(sel){ sel.style.display='none'; }",
+    "  window.addEventListener('bk-range-change', load);",
     "  load();",
     "})();",
   ].join("\n");

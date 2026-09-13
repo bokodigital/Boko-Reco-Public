@@ -211,15 +211,35 @@ function twoPropCI(p1, n1, p2, n2) {
   const d = p1 - p2, z = 1.96;
   return { lo: round4((d - z * se) * 100), hi: round4((d + z * se) * 100) }; // in pp
 }
-async function computeCr(shop, rangeDays) {
+function crDayRange(fromISO, toISO) {
+  const out = [];
+  const s = new Date(fromISO + "T00:00:00Z").getTime();
+  const e = new Date(toISO + "T00:00:00Z").getTime();
+  for (let t = s; t <= e && out.length < 366; t += 864e5) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
+}
+async function computeCr(shop, rangeDays, fromISO, toISO) {
   const cfg = await getCfg(shop);
+  const useRange = !!(fromISO && toISO);
+  const dayList = useRange ? crDayRange(fromISO, toISO) : null;
+  const spanDays = useRange ? dayList.length : rangeDays;
   const t = emptyDay();
-  for (let i = 0; i < rangeDays; i++) {
-    const row = (await dbGet(dayKey(shop, isoDay(Date.now() - i * 864e5)))) || null;
-    if (!row) continue;
-    t.pdp_sessions += row.pdp_sessions; t.exposed_sessions += row.exposed_sessions;
-    t.holdout_sessions += row.holdout_sessions; t.exposed_orders += row.exposed_orders;
-    t.unexposed_orders += row.unexposed_orders; t.holdout_orders += row.holdout_orders;
+  if (useRange) {
+    for (const dd of dayList) {
+      const row = (await dbGet(dayKey(shop, dd))) || null;
+      if (!row) continue;
+      t.pdp_sessions += row.pdp_sessions; t.exposed_sessions += row.exposed_sessions;
+      t.holdout_sessions += row.holdout_sessions; t.exposed_orders += row.exposed_orders;
+      t.unexposed_orders += row.unexposed_orders; t.holdout_orders += row.holdout_orders;
+    }
+  } else {
+    for (let i = 0; i < rangeDays; i++) {
+      const row = (await dbGet(dayKey(shop, isoDay(Date.now() - i * 864e5)))) || null;
+      if (!row) continue;
+      t.pdp_sessions += row.pdp_sessions; t.exposed_sessions += row.exposed_sessions;
+      t.holdout_sessions += row.holdout_sessions; t.exposed_orders += row.exposed_orders;
+      t.unexposed_orders += row.unexposed_orders; t.holdout_orders += row.holdout_orders;
+    }
   }
   const unexposedSessions = Math.max(0, t.pdp_sessions - t.exposed_sessions - t.holdout_sessions);
   const useHoldout = cfg.holdout_pct > 0 && t.holdout_sessions >= 100;
@@ -234,7 +254,7 @@ async function computeCr(shop, rangeDays) {
   const enough = t.exposed_sessions >= cfg.min_sessions && totalOrders >= cfg.min_orders;
   const significant = !!(ci && (ci.lo > 0 || ci.hi < 0));
   return {
-    range_days: rangeDays,
+    range_days: spanDays,
     method: useHoldout ? "holdout" : "attributed",
     method_label: useHoldout ? "Verified (holdout)" : "Estimated (attributed, PDP-matched)",
     holdout_pct: cfg.holdout_pct,
@@ -317,7 +337,10 @@ export function mountCr(app, deps) {
       }
       if (!meta.bf2) { try { await crBackfill(shop, token, deps, 90); } catch (e) {} meta.bf2 = true; await dbSet(metaKey(shop), meta); }
       const range = Math.min(365, Math.max(1, parseInt(req.query.range || "30", 10)));
-      res.status(200).send(JSON.stringify(await computeCr(shop, range)));
+      const fromQ = String(req.query.from || "").slice(0, 10);
+      const toQ = String(req.query.to || "").slice(0, 10);
+      const useRange = /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ);
+      res.status(200).send(JSON.stringify(useRange ? await computeCr(shop, range, fromQ, toQ) : await computeCr(shop, range)));
     } catch (e) { res.status(200).send(JSON.stringify({ error: e.message })); }
   });
 
@@ -413,7 +436,7 @@ export function crScript() {
     "  async function bkAuth(){var h={Accept:'application/json'};try{if(window.shopify&&shopify.idToken){h.Authorization='Bearer '+(await shopify.idToken());}}catch(e){}return h;}",
     "  async function load(){",
     "    body.innerHTML='Loading…'; note.textContent=''; if(exp) exp.innerHTML='';",
-    "    try{ var h=await bkAuth(); var d=await fetch('/crlift?range='+(sel?sel.value:'30'),{headers:h}).then(function(r){return r.json();});",
+    "    try{ var h=await bkAuth(); var qs=(window.bkImpactQS?window.bkImpactQS():('range='+(sel?sel.value:'30'))); var d=await fetch('/crlift?'+qs,{headers:h}).then(function(r){return r.json();});",
     "      if(d.error==='not installed'){body.innerHTML='Connect the app to see impact.';return;}",
     "      if(d.error){body.innerHTML='Could not load conversion lift ('+d.error+').';return;}",
     "      var t=d.totals||{}; var c=d.cr||{};",
@@ -447,6 +470,8 @@ export function crScript() {
     "    }catch(e){ body.innerHTML='Could not load conversion lift.'; }",
     "  }",
     "  if(sel) sel.addEventListener('change', load);",
+    "  if(sel){ sel.style.display='none'; }",
+    "  window.addEventListener('bk-range-change', load);",
     "  load();",
     "})();",
   ].join("\n");

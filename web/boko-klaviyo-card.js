@@ -15,12 +15,23 @@ export function mountKlaviyoImpact(app, deps) {
         String(req.query.id_token || "");
       const shop = shopFromToken ? shopFromToken(idToken) : null;
       if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
-      const days = Math.max(1, Math.min(90, parseInt(req.query.range, 10) || 30));
+      const fromQ = String(req.query.from || "").slice(0, 10);
+      const toQ = String(req.query.to || "").slice(0, 10);
+      const useRange = /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ);
+      let dayStrs = [];
+      if (useRange) {
+        const s = new Date(fromQ + "T00:00:00Z").getTime();
+        const e = new Date(toQ + "T00:00:00Z").getTime();
+        for (let t2 = s; t2 <= e && dayStrs.length < 366; t2 += 86400000) dayStrs.push(new Date(t2).toISOString().slice(0, 10));
+      } else {
+        const days0 = Math.max(1, Math.min(90, parseInt(req.query.range, 10) || 30));
+        for (let i = 0; i < days0; i++) dayStrs.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+      }
+      const days = dayStrs.length;
       let total = 0;
       const mod = {};
       const daily = [];
-      for (let i = 0; i < days; i++) {
-        const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+      for (const d of dayStrs) {
         const v = await kvGet("bkl_click:" + shop + ":" + d);
         const t = (v && v.total) || 0;
         if (t) {
@@ -70,7 +81,7 @@ export function klaviyoScript() {
     "    body.innerHTML='Loading\\u2026'; note.textContent='';",
     "    try{",
     "      var h=await bkKlvAuth();",
-    "      var d=await fetch('/klaviyo/impact?range='+(sel?sel.value:'30'),{headers:h}).then(function(r){return r.json();});",
+    "      var qs=(window.bkImpactQS?window.bkImpactQS():('range='+(sel?sel.value:'30'))); var d=await fetch('/klaviyo/impact?'+qs,{headers:h}).then(function(r){return r.json();});",
     "      if(d.error){ body.innerHTML='Could not load email recommendations ('+d.error+').'; return; }",
     "      var m=d.mod||{}; var ctl=m.ctl||0; var sfy=(m.sfy||0)+(m.best||0); var other=(d.total||0)-ctl-sfy;",
     "      if(!d.total){",
@@ -97,6 +108,8 @@ export function klaviyoScript() {
     "    }catch(e){ body.innerHTML='Could not load email recommendations.'; }",
     "  }",
     "  if(sel) sel.addEventListener('change', load);",
+    "  if(sel){ sel.style.display='none'; }",
+    "  window.addEventListener('bk-range-change', load);",
     "  load();",
     "})();",
   ].join("\n");

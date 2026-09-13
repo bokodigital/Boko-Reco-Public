@@ -805,7 +805,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
   </div>
   <div id="czCatNote" class="sub" style="margin:10px 0 0;color:#b45309;font-weight:600"></div>
         </div>
-        ${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}
+        <div id="bkRangeCtl" class="card" style="margin:0 0 20px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-weight:600;font-size:15px">App Impact — date range</div><select id="bkRangePreset" style="min-width:150px"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="120">Last 120 days</option><option value="365">Last 12 months</option><option value="custom">Custom range…</option></select><span id="bkRangeCustom" style="display:none;align-items:center;gap:6px"><input type="date" id="bkRangeFrom" style="padding:6px 8px;border:1px solid #E6E7EB;border-radius:8px;font-family:inherit"><span class="sub" style="margin:0">to</span><input type="date" id="bkRangeTo" style="padding:6px 8px;border:1px solid #E6E7EB;border-radius:8px;font-family:inherit"><button id="bkRangeApply" type="button" style="padding:6px 14px;border:0;border-radius:8px;background:#0B0B0B;color:#fff;cursor:pointer">Apply</button></span><span id="bkRangeLabel" class="sub" style="margin:0 0 0 auto"></span></div><p class="sub" style="margin:8px 0 0;font-size:12px;color:#8a8a8a">One range controls all three App Impact widgets below.</p></div>${impactCardHtml()}${crCardHtml()}${klaviyoCardHtml()}${klvSettingsCardHtml()}
         <div id="czGated">
   <div class="cz-global">
     <h3>Excluded collections</h3>
@@ -1102,7 +1102,42 @@ bkInitGate();
  var g=document.getElementById('czGrid');
  if(g&&window.MutationObserver){var mo=new MutationObserver(function(){if(g.querySelector('.cz-card'))build();});mo.observe(g,{childList:true});}
 })();
-</script><script>${impactScript()}</script><script>${crScript()}</script><script>${klaviyoScript()}</script></body></html>`;
+</script><script>(function(){
+  var preset=document.getElementById('bkRangePreset'),
+      cust=document.getElementById('bkRangeCustom'),
+      from=document.getElementById('bkRangeFrom'),
+      to=document.getElementById('bkRangeTo'),
+      applyBtn=document.getElementById('bkRangeApply'),
+      lbl=document.getElementById('bkRangeLabel');
+  var state={mode:'preset',range:30,from:'',to:''};
+  window.__bkRange=state;
+  window.bkImpactQS=function(){
+    if(state.mode==='custom'&&state.from&&state.to){return 'from='+encodeURIComponent(state.from)+'&to='+encodeURIComponent(state.to);}
+    return 'range='+state.range;
+  };
+  function fire(){ var ev; try{ev=new Event('bk-range-change');}catch(e){ev=document.createEvent('Event');ev.initEvent('bk-range-change',true,true);} window.dispatchEvent(ev); }
+  function label(){
+    if(!lbl) return;
+    if(state.mode==='custom'&&state.from&&state.to){lbl.textContent=state.from+'  →  '+state.to;return;}
+    var m={'7':'Last 7 days','30':'Last 30 days','90':'Last 90 days','120':'Last 120 days','365':'Last 12 months'};
+    lbl.textContent=m[String(state.range)]||('Last '+state.range+' days');
+  }
+  function initDates(){
+    if(!from||!to) return;
+    if(!to.value){ to.value=new Date().toISOString().slice(0,10); }
+    if(!from.value){ from.value=new Date(Date.now()-29*86400000).toISOString().slice(0,10); }
+  }
+  if(preset){ preset.addEventListener('change',function(){
+    if(preset.value==='custom'){ state.mode='custom'; if(cust) cust.style.display='inline-flex'; initDates(); state.from=from?from.value:''; state.to=to?to.value:''; label(); }
+    else { state.mode='preset'; state.range=parseInt(preset.value,10)||30; if(cust) cust.style.display='none'; label(); fire(); }
+  }); }
+  if(applyBtn){ applyBtn.addEventListener('click',function(){
+    if(!from||!to||!from.value||!to.value) return;
+    var a=from.value,b=to.value; if(a>b){ var tmp=a;a=b;b=tmp; from.value=a; to.value=b; }
+    state.mode='custom'; state.from=a; state.to=b; label(); fire();
+  }); }
+  label();
+})();</script><script>${impactScript()}</script><script>${crScript()}</script><script>${klaviyoScript()}</script></body></html>`;
 
 app.get("/dashboard", (req, res) => {
   const shop = req.query.shop || "";
