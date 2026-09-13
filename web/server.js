@@ -198,7 +198,7 @@ function bokoComplementaryPool(products, category, anchorId) {
     return String(p.id) !== String(anchorId) && String(p.category || "").toLowerCase() !== cat && p.available !== false;
   });
 }
-mountKlaviyo(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool });
+mountKlaviyo(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool, recommendForShop, toEngineProduct, getIndustry: async (s) => { try { const ri = await db.get("boko_industry:" + s); return (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) { return null; } } });
 mountKlaviyoFeeds(app);
 mountKlaviyoCtlFeed(app, { getToken, loadProducts, recommend, complementaryPool: bokoComplementaryPool, recommendForShop, toEngineProduct, getIndustry: async (s) => { try { const ri = await db.get("boko_industry:" + s); return (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) { return null; } } });
 mountKlaviyoImpact(app, { shopFromToken: shopFromSessionToken });

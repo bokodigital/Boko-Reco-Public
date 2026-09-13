@@ -67,30 +67,57 @@ function toItem(shop, p) {
 }
 
 export function mountKlaviyo(app, deps) {
-  const { getToken, loadProducts, recommend, complementaryPool } = deps;
+  const { getToken, loadProducts, recommend, complementaryPool, recommendForShop, toEngineProduct, getIndustry } = deps;
 
   async function computeShop(shop, opts) {
     const o = opts || {};
     const token = await getToken(shop);
     if (!token) throw new Error("no token for " + shop);
-    const products = await loadProducts(shop, token, 100);
+    // Business-category (sector) awareness: identical logic to the storefront widget
+    // and the send-time ctl-live feed. When the shop has an industry set we pair via
+    // recommendForShop over the sector engine; otherwise we fall back to the generic
+    // complementary pool + base recommend.
+    let industry = null;
+    if (getIndustry) { try { industry = await getIndustry(shop); } catch (e) {} }
+    const sector = !!(industry && recommendForShop && toEngineProduct);
+    const products = await loadProducts(shop, token, o.maxProducts || 250, "", !!industry);
+    const byId = {};
+    for (const p of products) byId[pid(p)] = p;
+    const eng = sector ? products.map((p) => toEngineProduct(p, p.bokoMf || [])) : null;
     const maxAnchors = Math.min(products.length, o.maxAnchors || 60);
     const perAnchor = o.perAnchor || 4;
     let done = 0;
     let skipped = 0;
-    for (const anchor of products.slice(0, maxAnchors)) {
+    let sectorHits = 0;
+    for (let ai = 0; ai < maxAnchors; ai++) {
+      const anchor = products[ai];
       try {
         const anum = pid(anchor);
         let picks = [];
-        const cp = complementaryPool(products, anchor.category, anum);
-        if (cp && cp.length) {
-          picks = await recommend({ products: cp, anchor: null, limit: perAnchor, useLLM: false });
+        let usedSector = false;
+        if (sector) {
+          try {
+            const engAnchor = toEngineProduct(anchor, anchor.bokoMf || []);
+            const raw = await recommendForShop({ products: eng, anchor: engAnchor, cart: [], industry, limit: perAnchor, useLLM: false });
+            // Resolve engine picks back to the original product objects so cached
+            // items keep full title/price/image/handle.
+            picks = (raw || []).map((pk) => byId[pid(pk)] || pk).filter((p) => pid(p) !== anum);
+            if (picks.length) usedSector = true;
+          } catch (e) { picks = []; }
+        }
+        if (!picks || !picks.length) {
+          const cp = complementaryPool(products, anchor.category, anum);
+          if (cp && cp.length) {
+            picks = await recommend({ products: cp, anchor: null, limit: perAnchor, useLLM: false });
+          }
+          usedSector = false;
         }
         if (!picks || !picks.length) { skipped++; continue; }
+        if (usedSector) sectorHits++;
         await kvSet("bkl_ctl:" + shop + ":" + anum, {
           anchor: toItem(shop, anchor),
           items: picks.slice(0, perAnchor).map((p) => toItem(shop, p)),
-          algo: "ctl-v1-complement",
+          algo: usedSector ? "ctl-live-sector" : "ctl-v1-complement",
           at: new Date().toISOString(),
         });
         done++;
@@ -105,7 +132,10 @@ export function mountKlaviyo(app, deps) {
     const summary = {
       shop,
       products: products.length,
+      industry: industry || null,
+      sector: sector,
       ctl_cached: done,
+      ctl_sector: sectorHits,
       ctl_skipped: skipped,
       at: new Date().toISOString(),
     };
