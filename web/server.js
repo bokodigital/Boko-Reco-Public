@@ -469,8 +469,10 @@ function bokoNormTag(v) {
   return null;
 }
 
-async function loadStats(shop, token, days) {
-  const since = new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
+async function loadStats(shop, token, days, fromISO, toISO) {
+  const useRange = !!(fromISO && toISO);
+  const since = useRange ? fromISO : new Date(Date.now() - (days || 90) * 864e5).toISOString().slice(0, 10);
+  const until = useRange ? toISO : null;
   // Paginate through ALL orders created in the selected timeframe (not just the
   // first page). Shopify caps `first` at 250 for orders; we follow the cursor
   // until hasNextPage is false. MAX_PAGES is a runaway guard, not a business cap.
@@ -480,7 +482,7 @@ async function loadStats(shop, token, days) {
   let cursor = null, hasNext = true, pages = 0, truncated = false;
   while (hasNext) {
     if (pages >= MAX_PAGES) { truncated = true; break; }
-    const j = await gql(shop, token, query, { n: 250, q: "created_at:>=" + since, cursor });
+    const j = await gql(shop, token, query, { n: 250, q: "created_at:>=" + since + (until ? (" created_at:<=" + until) : ""), cursor });
     if (j.errors) {
       const __es = JSON.stringify(j.errors);
       const __locked = __es.indexOf("ACCESS_DENIED") >= 0 || __es.indexOf("protected-customer-data") >= 0 || __es.indexOf("not approved to access the Order") >= 0;
@@ -531,7 +533,10 @@ app.get("/stats", async (req, res) => {
     if (!token) return res.status(200).send(JSON.stringify({ error: "not installed", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
     if (!(await billingOK(shop, token))) return res.status(200).send(JSON.stringify({ error: "subscription required", pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
     const days = Math.min(parseInt(req.query.days || "90", 10), 365);
-    res.status(200).send(JSON.stringify(await loadStats(shop, token, days)));
+    const fromQ = String(req.query.from || "").slice(0, 10);
+    const toQ = String(req.query.to || "").slice(0, 10);
+    const useRange = /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ);
+    res.status(200).send(JSON.stringify(useRange ? await loadStats(shop, token, days, fromQ, toQ) : await loadStats(shop, token, days)));
   } catch (e) {
     res.status(200).send(JSON.stringify({ error: e.message, pdp: { total: 0, revenue: 0, items: [] }, cart_drawer: { total: 0, revenue: 0, items: [] }, sfy_page: { total: 0, revenue: 0, items: [] } }));
   }
@@ -699,7 +704,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 <p class="sub">Items and revenue from products added via your recommendation widgets.</p>
 
 <div class="row"><label class="sub" style="margin:0">Period</label>
-<select id="days"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="365">Last 12 months</option></select>
+<select id="days"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="120">Last 120 days</option><option value="365">Last 12 months</option><option value="custom">Custom range…</option></select><span id="daysCustom" style="display:none;align-items:center;gap:6px;margin-left:8px"><input type="date" id="daysFrom" style="padding:6px 8px;border:1px solid #E6E7EB;border-radius:8px;font-family:inherit"><span class="sub" style="margin:0">to</span><input type="date" id="daysTo" style="padding:6px 8px;border:1px solid #E6E7EB;border-radius:8px;font-family:inherit"><button id="daysApply" type="button" style="padding:6px 14px;border:0;border-radius:8px;background:#0B0B0B;color:#fff;cursor:pointer">Apply</button></span>
 <span id="meta" class="sub" style="margin:0 0 0 auto"></span></div>
 <div id="err"></div>
 <div class="hero"><div><div class="v lime" id="revTotal">–</div><div class="x">total revenue from recommendations</div></div>
@@ -836,7 +841,9 @@ async function authedPost(url){
 }
 function load(){
   var days=document.getElementById("days").value;
-  authedFetch("/stats?days="+days).then(function(d){
+  var _qs;
+  if(days==="custom"){ var _f=document.getElementById("daysFrom"), _t=document.getElementById("daysTo"); if(_f&&_t&&_f.value&&_t.value){ var _a=_f.value,_b=_t.value; if(_a>_b){ var _tmp=_a;_a=_b;_b=_tmp; } _qs="from="+encodeURIComponent(_a)+"&to="+encodeURIComponent(_b); } else { _qs="days=90"; } } else { _qs="days="+days; }
+  authedFetch("/stats?"+_qs).then(function(d){
     CUR=d.currency||"USD";
     var shopParam=new URLSearchParams(window.location.search).get("shop")||"";
     document.getElementById("err").innerHTML=(function(){if(!d.error)return"";if(d.error==="unauthorized")return "<div class='err'>Couldn't verify your session. Open this from Shopify Admin &rarr; Apps.</div>";if(d.error==="subscription required")return "<div class='err'>An active subscription is required. <a href='/billing/start?shop="+encodeURIComponent(shopParam)+"' target='_top'>Subscribe now</a>.</div>";if(d.error==="orders_locked")return "<div style='background:#eef4ff;border:1px solid #c9d8f5;color:#33415c;padding:10px 14px;border-radius:8px;font-size:13px'>Revenue from recommendations will appear once Shopify approves protected customer data access for this app. Your recommendation widgets are fully active.</div>";return "<div class='err'>Couldn't load stats: "+d.error+"</div>";})();
@@ -855,7 +862,7 @@ function load(){
     document.getElementById("foot").textContent="Counts reflect orders since "+(d.since||"")+" whose items were added via a Boko recommendation widget.";
   }).catch(function(){document.getElementById("err").innerHTML="<div class='err'>Couldn't load stats.</div>";});
 }
-document.getElementById("days").addEventListener("change",load); load();
+document.getElementById("days").addEventListener("change",function(){ var _s=document.getElementById("days"), _c=document.getElementById("daysCustom"); if(_s.value==="custom"){ if(_c) _c.style.display="inline-flex"; var _f=document.getElementById("daysFrom"),_t=document.getElementById("daysTo"); if(_f&&!_f.value){_f.value=new Date(Date.now()-29*86400000).toISOString().slice(0,10);} if(_t&&!_t.value){_t.value=new Date().toISOString().slice(0,10);} } else { if(_c) _c.style.display="none"; load(); } }); var _da=document.getElementById("daysApply"); if(_da){ _da.addEventListener("click",load); } load();
 
 var CZ_COMPONENTS=[["rail","Complete the Look"],["cart","Cart drawer carousel"],["sfy","Selected For You collection"]];
 var czState=null, czCollections=[], czLoaded=false;
