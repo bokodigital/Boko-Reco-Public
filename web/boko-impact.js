@@ -194,6 +194,8 @@ async function computeImpactLive(shop, token, deps, rangeDays, fromISO, toISO) {
   const until = useRange ? (toISO + "T23:59:59Z") : null;
   const spanDays = useRange ? (Math.floor((new Date(toISO + "T00:00:00Z") - new Date(fromISO + "T00:00:00Z")) / 864e5) + 1) : rangeDays;
   const qfilter = "created_at:>=" + since + (until ? (" created_at:<=" + until) : "");
+  let currency = "";
+  try { const _cq = await deps.gql(shop, token, "{ shop { currencyCode } }", {}); currency = (_cq && _cq.data && _cq.data.shop && _cq.data.shop.currencyCode) || ""; } catch (e) {}
   const q = `query($q:String!,$after:String){ orders(first:100, query:$q, sortKey:CREATED_AT, after:$after){
       edges{ cursor node{ id createdAt
         subtotalPriceSet{ shopMoney{ amount } } totalPriceSet{ shopMoney{ amount } }
@@ -236,6 +238,7 @@ async function computeImpactLive(shop, token, deps, rangeDays, fromISO, toISO) {
   const upliftPct = baseline > 0 ? (attributed / baseline) * 100 : 0;
   return {
     range_days: spanDays,
+    currency: currency || "USD",
     k,
     live: true,
     enough_data: orders >= MIN_ORDERS,
@@ -437,8 +440,9 @@ export function impactScript() {
     "  var body=document.getElementById('bkImpactBody'), note=document.getElementById('bkImpactNote'), exp=document.getElementById('bkImpactExplain'), sel=document.getElementById('bkImpactRange');",
     "  if(!body) return;",
     "  var hasTiles=false;",
-    "  function money(n){try{return (window.Shopify&&Shopify.currency&&Shopify.currency.active?Shopify.currency.active+' ':'$')+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}catch(e){return '$'+Number(n||0).toFixed(2);}}",
-    "  function tile(label,val,sub){return \"<div style='flex:1 1 150px;min-width:150px;border:1px solid #e6e6e6;border-radius:10px;padding:14px'><div style='font-size:12px;color:#8a8a8a'>\"+label+\"</div><div style='font-size:22px;font-weight:700;margin-top:4px'>\"+val+\"</div>\"+(sub?\"<div style='font-size:12px;color:#8a8a8a;margin-top:2px'>\"+sub+\"</div>\":\"\")+\"</div>\";}",
+    "  var CUR='USD';",
+    "  function money(n,cur){cur=cur||CUR||'USD';try{return new Intl.NumberFormat(undefined,{style:'currency',currency:cur,currencyDisplay:'code',maximumFractionDigits:2}).format(Number(n||0));}catch(e){return cur+' '+Number(n||0).toFixed(2);}}",
+    "  function tile(label,val,sub){return \"<div style='flex:1 1 150px;min-width:150px;border:1px solid #e6e6e6;border-radius:10px;padding:14px'><div style='font-size:12px;color:#8a8a8a'>\"+label+\"</div><div style='font-size:22px;font-weight:700;margin-top:4px;color:#0b0b0b'>\"+val+\"</div>\"+(sub?\"<div style='font-size:12px;color:#8a8a8a;margin-top:2px'>\"+sub+\"</div>\":\"\")+\"</div>\";}",
     "  function row(name,formula,result){return \"<tr><td style='padding:4px 10px 4px 0;font-weight:600;white-space:nowrap;vertical-align:top'>\"+name+\"</td><td style='padding:4px 0;color:#555'>\"+formula+\" = <b>\"+result+\"</b></td></tr>\";}",
     "  async function bkAuth(){var h={Accept:'application/json'};try{if(window.shopify&&shopify.idToken){h.Authorization='Bearer '+(await shopify.idToken());}}catch(e){}return h;}",
     "  async function load(){",
@@ -447,7 +451,7 @@ export function impactScript() {
     "      if(d.error==='not installed'){body.innerHTML='Connect the app to see impact.';return;}",
     "      if(d.error){body.innerHTML='Could not load impact ('+d.error+').';return;}",
     "      if(!d.enough_data){ body.innerHTML=\"<div style='color:#8a8a8a'>Gathering data — impact shows once there are at least \"+d.min_orders+\" orders in range (\"+(d.totals?d.totals.orders:0)+\" so far).</div>\"; }",
-    "      var a=d.aov||{}; var t=d.totals||{}; var kpct=Math.round((d.k||0.7)*100);",
+    "      CUR=(d&&d.currency)||CUR; var a=d.aov||{}; var t=d.totals||{}; var kpct=Math.round((d.k||0.7)*100);",
     "      var html=\"<div style='display:flex;gap:12px;flex-wrap:wrap'>\";",
     "      html+=tile('AOV improvement', (a.uplift_pct_incr>=0?'+':'')+ (a.uplift_pct_incr||0).toFixed(1)+'%', 'estimated');",
     "      html+=tile('Added per order', '+'+money(a.added_per_order_incr), 'from recommendations');",

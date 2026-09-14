@@ -549,7 +549,10 @@ app.get("/funnel", async (req, res) => {
     const shop = shopFromSessionToken(idToken);
     if (!shop) return res.status(401).send(JSON.stringify({ error: "unauthorized" }));
     const days = Math.min(parseInt(req.query.days || "30", 10), 365);
-    res.status(200).send(JSON.stringify(await funnelCounts(shop, days)));
+    const fromQ = String(req.query.from || "").slice(0, 10);
+    const toQ = String(req.query.to || "").slice(0, 10);
+    const useRange = /^\d{4}-\d{2}-\d{2}$/.test(fromQ) && /^\d{4}-\d{2}-\d{2}$/.test(toQ);
+    res.status(200).send(JSON.stringify(useRange ? await funnelCounts(shop, days, fromQ, toQ) : await funnelCounts(shop, days)));
   } catch (e) {
     res.status(200).send(JSON.stringify({ error: e.message }));
   }
@@ -1060,10 +1063,12 @@ bkInitGate();
    var cards=perf.querySelector('.cards');
    if(cards&&cards.parentNode){cards.parentNode.insertBefore(wrap,cards.nextSibling);}else{perf.appendChild(wrap);}
   }
-  render({},{});try{Promise.all([Promise.resolve(authedFetch('/funnel')).catch(function(){return {};}),Promise.resolve(authedFetch('/stats')).catch(function(){return {};})]).then(function(a){render(a[0]||{},a[1]||{});}).catch(function(){});}catch(e){}
+  var _fq=(function(){var s=document.getElementById('days');var v=s?s.value:'';if(v==='custom'){var f=document.getElementById('daysFrom'),t=document.getElementById('daysTo');if(f&&t&&f.value&&t.value){var a=f.value,b=t.value;if(a>b){var tmp=a;a=b;b=tmp;}return 'from='+encodeURIComponent(a)+'&to='+encodeURIComponent(b);}return 'days=90';}return 'days='+(v||'90');})();
+  render({},{});try{Promise.all([Promise.resolve(authedFetch('/funnel?'+_fq)).catch(function(){return {};}),Promise.resolve(authedFetch('/stats?'+_fq)).catch(function(){return {};})]).then(function(a){render(a[0]||{},a[1]||{});}).catch(function(){});}catch(e){}
  }
  setTimeout(build,500);
  var dd=document.getElementById('days');if(dd)dd.addEventListener('change',function(){setTimeout(build,60);});
+ var da2=document.getElementById('daysApply');if(da2)da2.addEventListener('click',function(){setTimeout(build,60);});
  var pb=document.getElementById('tabBtnPerf');if(pb)pb.addEventListener('click',function(){setTimeout(build,60);});
 })();
  function val(id,d){var e=document.getElementById(id);var v=e&&e.value!=null?(''+e.value).trim():'';return v||d;}

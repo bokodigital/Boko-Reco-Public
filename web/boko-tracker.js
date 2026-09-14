@@ -80,14 +80,16 @@ async function track(shop, event, source) {
 }
 
 // Aggregate a shop's events over the last `days` days into { bucket: { event: count } }.
-async function funnelCounts(shop, days = 30) {
+async function funnelCounts(shop, days = 30, fromISO, toISO) {
   const out = { pdp: {}, cart_drawer: {}, sfy: {} };
   if (!shop) return out;
   const prefix = PREFIX + shop + ":";
-  const since = new Date(Date.now() - Math.max(1, days) * 864e5).toISOString().slice(0, 10);
+  const useRange = !!(fromISO && toISO);
+  const since = useRange ? String(fromISO).slice(0, 10) : new Date(Date.now() - Math.max(1, days) * 864e5).toISOString().slice(0, 10);
+  const until = useRange ? String(toISO).slice(0, 10) : null;
   const keys = (await listShopKeys(shop)).filter((k) => {
     const day = String(k).slice(prefix.length);
-    return day && day >= since; // YYYY-MM-DD strings sort chronologically
+    return day && day >= since && (!until || day <= until); // YYYY-MM-DD strings sort chronologically
   });
   await Promise.all(keys.map(async (k) => {
     try {
