@@ -518,6 +518,7 @@ async function loadStats(shop, token, days, fromISO, toISO) {
     const items = Object.keys(s.items).map((key) => ({ title: key, count: s.items[key].count, revenue: Math.round(s.items[key].rev * 100) / 100 })).sort((a, b) => b.count - a.count);
     return { total: items.reduce((x, i) => x + i.count, 0), revenue: Math.round(s.rev * 100) / 100, items };
   };
+  try { const _cq = await gql(shop, token, "{ shop { currencyCode } }", {}); const _cc = _cq && _cq.data && _cq.data.shop && _cq.data.shop.currencyCode; if (_cc) currency = _cc; } catch (e) {}
   const pdp = pack(src.pdp), cd = pack(src.cart_drawer), sfy = pack(src.sfy_page);
   return { ordersLocked: false, ordersScanned: orders.length, truncated, since, currency, totalRevenue: Math.round((pdp.revenue + cd.revenue + sfy.revenue) * 100) / 100, totalItems: pdp.total + cd.total + sfy.total, pdp, cart_drawer: cd, sfy_page: sfy };
 }
@@ -830,7 +831,7 @@ input:disabled+.slider{opacity:.5;cursor:default}
 </div>
 <script>
 var CUR="";
-function fmt(n){try{return new Intl.NumberFormat(undefined,{style:"currency",currency:CUR||"USD"}).format(n||0);}catch(e){return "$"+(Number(n||0)).toFixed(2);}}
+function fmt(n){var c=CUR||"USD";try{return new Intl.NumberFormat(undefined,{style:"currency",currency:c,currencyDisplay:"code"}).format(n||0);}catch(e){return c+" "+(Number(n||0)).toFixed(2);}}
 function rows(tb,items){tb.innerHTML=(items&&items.length)?items.map(function(i){return "<tr><td>"+i.title+"</td><td class='n'>"+i.count+"</td><td class='r'>"+fmt(i.revenue)+"</td></tr>";}).join(""):"<tr><td colspan='3' class='empty'>No purchases yet from this source.</td></tr>";}
 async function authedFetch(url){
   var headers={Accept:"application/json"};
