@@ -13,6 +13,13 @@
     assign cols = 4
   endif
   assign cur = product.selected_or_first_available_variant
+  assign acolor = ''
+  for opt in product.options_with_values
+    assign bk_on = opt.name | downcase
+    if bk_on == 'colour' or bk_on == 'color' or bk_on == 'shade'
+      assign acolor = opt.selected_value
+    endif
+  endfor
   assign font_css = "inherit"
   assign gfont = ""
   if block.settings.font_family != blank
@@ -32,6 +39,8 @@
 
 <section id="boko-ctl-{{ block.id }}" class="boko-ctl" data-boko-ctl
   data-proxy="/apps/reco/recommend"
+  data-ctl="/apps/reco/ctl"
+  data-acolor="{{ acolor | escape }}"
   data-limit="{{ limit }}"
   {% if product %}data-anchor="{{ product.id }}" data-atype="{{ product.type | escape }}" data-atitle="{{ product.title | escape }}" data-atags="{{ product.tags | join: ',' | escape }}" data-aprice="{{ product.price | divided_by: 100.0 }}"{% endif %}>
   <div class="boko-ctl__wrap">
@@ -108,8 +117,11 @@
   try{fetch(proxy.replace(/\/recommend\/?$/,"/config"),{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(cfg){var b=cfg&&cfg.global&&cfg.global.bundle;if(!b)return;if(b.percentage>0)discount=Number(b.percentage);if(b.minItems>0)minItems=Number(b.minItems);renderBar();}).catch(function(){});}catch(e){}
 
   function getItems(){
-    var url=proxy+"?type=recommended&limit="+limit+(anchor?"&anchor="+encodeURIComponent(anchor):"")+(aType?"&atype="+encodeURIComponent(aType):"")+(aTitle?"&atitle="+encodeURIComponent(aTitle):"")+(aTags?"&atags="+encodeURIComponent(aTags):"")+(aPrice?"&aprice="+encodeURIComponent(aPrice):"");
-    return fetch(url,{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){return (d.items||[]).slice(0,limit);}).catch(function(){return [];});
+    var ctl=root.getAttribute("data-ctl")||"",aColor=root.getAttribute("data-acolor")||"";
+    var url="?type=recommended&limit="+limit+(anchor?"&anchor="+encodeURIComponent(anchor):"")+(aType?"&atype="+encodeURIComponent(aType):"")+(aTitle?"&atitle="+encodeURIComponent(aTitle):"")+(aTags?"&atags="+encodeURIComponent(aTags):"")+(aPrice?"&aprice="+encodeURIComponent(aPrice):"");
+    function list(u){return fetch(u,{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){return (d.items||[]).slice(0,limit);}).catch(function(){return [];});}
+    if(!ctl)return list(proxy+url);
+    return list(ctl+url+(aColor?"&acolor="+encodeURIComponent(aColor):"")).then(function(items){return items.length?items:list(proxy+url);});
   }
   function firstAvail(p){for(var i=0;i<(p.variants||[]).length;i++)if(p.variants[i].available)return p.variants[i];return (p.variants||[])[0]||{id:p.variantId,price:p.price,options:[],available:true};}
   function variantFor(p,sel){for(var i=0;i<p.variants.length;i++){var v=p.variants[i],ok=true;for(var k=0;k<sel.length;k++){if(sel[k]!=null&&v.options[k]!==sel[k]){ok=false;break;}}if(ok)return v;}return null;}

@@ -31,6 +31,7 @@ import { mountKlaviyoProvision } from "./boko-klaviyo-provision.js";
 import { mountImpact, impactCardHtml, impactScript } from "./boko-impact.js"; // BOKO IMPACT - AOV Improvement card
 import { mountCr, crCardHtml, crScript } from "./boko-cr.js"; // BOKO CR - Conversion Lift card
 import { recommendForShop } from "./sector/engine.js";
+import { mountCtl2 } from "./boko-ctl2.js"; // BOKO CTL2 - Complete the Look v2 + colour
 import { toEngineProduct, BOKO_METAFIELD_FRAGMENT } from "./sector/loader.js";
 import { track, funnelCounts } from "./boko-tracker.js";
 import { loadSettings, saveSettings, publicConfig, handlesToCollectionGids } from "./boko-settings.js";
@@ -359,7 +360,7 @@ async function loadProducts(shop, token, limit = 100, productType = "", includeB
   return results;
 }
 
-app.get("/proxy/recommend", async (req, res) => {
+async function bokoProxyRecommend(req, res) {
   res.set("Content-Type", "application/json");
   try {
     if (!verifyProxy(req.query)) return res.status(401).send(JSON.stringify({ items: [], error: "bad signature" }));
@@ -407,7 +408,10 @@ app.get("/proxy/recommend", async (req, res) => {
   } catch (e) {
     res.status(200).send(JSON.stringify({ items: [], error: e.message }));
   }
-});
+}
+app.get("/proxy/recommend", bokoProxyRecommend);
+// BOKO CTL2 - Complete the Look v2 + colour (GET /proxy/ctl). Fashion shops only; others fall back to bokoProxyRecommend.
+mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, loadSettings, fallback: bokoProxyRecommend, getIndustry: async (s) => { try { const ri = await db.get("boko_industry:" + s); return (ri && typeof ri === "object" && "ok" in ri) ? (ri.ok ? ri.value : null) : (ri || null); } catch (e) { return null; } } });
 
 // ---------- Public storefront config (theme extensions read component styling) ----------
 app.get("/proxy/config", async (req, res) => {
