@@ -542,7 +542,7 @@ const SIZE_OPT = /size/i;
 const numId = gid => { const m = String(gid || "").match(/(\d+)$/); return m ? m[1] : String(gid || ""); };
 
 // n: product node; colls: [{id, handle}]; variants: variant nodes; options: [{name, values}]
-function compactProduct(n, colls, variants, options) {
+function compactProduct(n, colls, variants, options, cp) { // BOKO CTL3LIVE: + cp = Shopify colour/pattern labels
   const tags = (n.tags || []).map(String);
   const tagsLc = tags.map(t => t.toLowerCase());
   const pt = (n.productType || "").toLowerCase();
@@ -560,8 +560,10 @@ function compactProduct(n, colls, variants, options) {
     cols: canonicalCols(handles, n.productType, n.title, tags), collGids: colls.map(c => c.id).filter(Boolean),
     createdAt: n.publishedAt || n.createdAt, price: parseFloat(first.price) || 0,
     img: (n.featuredImage && n.featuredImage.url) || "", variantId: numId(first.id), available: true,
-    color: opt(first, COLOR_OPT).toLowerCase() || colorFromTitle(n.title), sizes,
+    color: shownColour(n, variants, first, opt) || colorFromTitle(n.title), sizes, // BOKO CTL3LIVE (FIX3)
     pattern: TITLE_PRINT_RE.test(String(n.title || "").toLowerCase()),
+    cp: cp || [], // BOKO CTL3LIVE
+    colours: (() => { const seen = new Set(), out = []; for (const v of av) { const c = opt(v, COLOR_OPT).toLowerCase(); if (!c || seen.has(c)) continue; seen.add(c); out.push({ color: c, variantId: numId(v.id), img: (v.image && v.image.url) || "", price: parseFloat(v.price) || 0 }); } return out; })(), // BOKO CTL3LIVE
     options: rawOpts.map(o => ({ name: o.name, values: o.values || [] })),
     variants: variants.map(v => ({
       id: parseInt(numId(v.id), 10), title: v.title, price: parseFloat(v.price), available: !!v.availableForSale,
@@ -573,28 +575,29 @@ function compactProduct(n, colls, variants, options) {
 const BULK_QUERY = `{ products(query: "status:active") { edges { node {
   id handle title vendor productType tags createdAt publishedAt isGiftCard featuredImage { url } options { name values }
   collections { edges { node { id handle } } }
-  variants { edges { node { id title price availableForSale selectedOptions { name value } } } }
+  variants { edges { node { id title price availableForSale image { url } selectedOptions { name value } } } }
 } } } }`;
 
 function parseJsonl(text) {
-  const prods = new Map(), colls = new Map(), vars = new Map();
+  const prods = new Map(), colls = new Map(), vars = new Map(), cps = new Map(); // BOKO CTL3LIVE
   for (const line of text.split("\n")) {
     if (!line) continue;
     let o; try { o = JSON.parse(line); } catch (e) { continue; }
     const id = String(o.id || "");
     if (!o.__parentId && id.includes("/Product/")) { prods.set(id, o); continue; }
     if (id.includes("/Collection/")) { if (!colls.has(o.__parentId)) colls.set(o.__parentId, []); colls.get(o.__parentId).push({ id, handle: o.handle }); continue; }
+    if (id.includes("/Metaobject/")) { const v = o.field && o.field.value; if (v) { if (!cps.has(o.__parentId)) cps.set(o.__parentId, []); cps.get(o.__parentId).push(String(v).trim()); } continue; } // BOKO CTL3LIVE
     if (id.includes("/ProductVariant/")) { if (!vars.has(o.__parentId)) vars.set(o.__parentId, []); vars.get(o.__parentId).push(o); }
   }
   const out = [];
-  for (const [id, n] of prods) { const p = compactProduct(n, colls.get(id) || [], vars.get(id) || [], n.options || []); if (p) out.push(p); }
+  for (const [id, n] of prods) { const p = compactProduct(n, colls.get(id) || [], vars.get(id) || [], n.options || [], cps.get(id) || []); if (p) out.push(p); }
   return out;
 }
 
 const ANCHOR_QUERY = `query($id: ID!) { product(id: $id) {
   id handle title vendor productType tags createdAt publishedAt isGiftCard featuredImage { url } options { name values }
   collections(first: 50) { nodes { id handle } }
-  variants(first: 100) { nodes { id title price availableForSale selectedOptions { name value } } }
+  variants(first: 100) { nodes { id title price availableForSale image { url } selectedOptions { name value } } }
 } }`;
 
 /**
@@ -602,6 +605,53 @@ const ANCHOR_QUERY = `query($id: ID!) { product(id: $id) {
  *   fallback(req, res) = the existing /proxy/recommend handler (used for non-fashion shops and while the
  *   catalogue is building, so the section is never blank).
  */
+// ===== BOKO CTL3LIVE: Complete the Look v3 (stylist engine, no guessing) =====
+import { completeTheLook3 } from "./boko-ctl3.js";
+const CTL_DEFAULT_ENGINE = 3; // 3 = stylist engine for the section + Klaviyo. Set to 2 to roll back (no other change needed).
+// FIX3: judge a product by the colour its PHOTO shows (variant whose image is the featured image)
+function shownColour(n, variants, first, opt) {
+  const strip = u => String(u || "").split("?")[0];
+  const fi = strip(n.featuredImage && n.featuredImage.url);
+  if (fi) {
+    const hit = (variants || []).find(v => v.image && strip(v.image.url) === fi && opt(v, COLOR_OPT));
+    if (hit) return opt(hit, COLOR_OPT).toLowerCase();
+  }
+  return opt(first, COLOR_OPT).toLowerCase();
+}
+// Shopify standard category metafield "Colour/Pattern" (fills products that have no Colour option)
+const CP_BULK = 'metafield(namespace: "shopify", key: "color-pattern") { references { edges { node { ... on Metaobject { id field(key: "label") { value } } } } } }';
+const CP_ONE = 'metafield(namespace: "shopify", key: "color-pattern") { references(first: 10) { nodes { ... on Metaobject { id field(key: "label") { value } } } } }';
+const BULK_QUERY_CP = BULK_QUERY.replace(/\}\s*\}\s*\}\s*\}\s*$/, "  " + CP_BULK + "\n} } } }");
+const ANCHOR_QUERY_CP = ANCHOR_QUERY.replace(/\}\s*\}\s*$/, "  " + CP_ONE + "\n} }");
+if (BULK_QUERY_CP === BULK_QUERY || ANCHOR_QUERY_CP === ANCHOR_QUERY) console.warn("[ctl3] colour/pattern query not built - check BULK_QUERY / ANCHOR_QUERY endings");
+const noCp = {}; // shop -> true when Shopify refuses the colour/pattern field (plain query is used instead)
+// LIVE ADD-ON 1: gender containment (mixed men's/women's stores). Women's product never gets men's-only items and vice versa.
+function ctl3Gender(p) {
+  const w = [...(p.tagsLc || []), ...(p.cols || [])].map(x => String(x).toLowerCase());
+  const has = re => w.some(x => re.test(x));
+  if (has(/(^|-)unisex($|-)/)) return "u";
+  const f = has(/^(women|womens|women's|womenswear|ladies|female)$|(^|-)(women|womens|ladies)($|-)/);
+  const m = has(/^(men|mens|men's|menswear|male)$|(^|-)(men|mens)($|-)/);
+  return f && !m ? "f" : m && !f ? "m" : null;
+}
+function ctl3GenderPool(pool, anchor) {
+  const g = ctl3Gender(anchor);
+  if (g !== "f" && g !== "m") return pool;
+  return pool.filter(p => { const pg = ctl3Gender(p); return !pg || pg === "u" || pg === g; });
+}
+// LIVE ADD-ON 2: the theme-app-extension block needs options/variants for size pickers; add them (with each colour's photo).
+function ctl3Enrich(items, cat) {
+  return items.map(it => {
+    const src = cat && cat.byId && cat.byId.get(String(it.id).split("/").pop());
+    if (!src || !src.variants) return it;
+    const ci = (src.options || []).findIndex(o => /^(colou?r|shade)$/i.test(o.name));
+    const img = {}; (src.colours || []).forEach(c => { if (c.img) img[c.color] = c.img; });
+    const variants = src.variants.map(v => (ci >= 0 && v.options && img[String(v.options[ci] || "").toLowerCase()]) ? { ...v, img: img[String(v.options[ci]).toLowerCase()] } : v);
+    return { ...it, options: src.options || [], variants };
+  });
+}
+// ===== /BOKO CTL3LIVE =====
+
 export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getIndustry, loadSettings, fallback }) {
   const TTL = 30 * 60 * 1000, OP_MAX = 20 * 60 * 1000;
   const mem = {}; // shop -> { at, products, byId }
@@ -612,9 +662,10 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
   const index = c => { c.byId = new Map(c.products.map(p => [p.id, p])); return c; };
 
   async function startOp(shop, token) {
-    const j = await gql(shop, token, `mutation($q: String!) { bulkOperationRunQuery(query: $q) { bulkOperation { id status } userErrors { field message } } }`, { q: BULK_QUERY });
-    const r = j && j.data && j.data.bulkOperationRunQuery;
-    if (r && r.bulkOperation) { ops[shop] = { id: r.bulkOperation.id, startedAt: Date.now(), lastPoll: 0 }; await dbSet(kOp(shop), ops[shop]); return ops[shop]; }
+    const j = await gql(shop, token, `mutation($q: String!) { bulkOperationRunQuery(query: $q) { bulkOperation { id status } userErrors { field message } } }`, { q: noCp[shop] ? BULK_QUERY : BULK_QUERY_CP }); // BOKO CTL3LIVE
+    let r = j && j.data && j.data.bulkOperationRunQuery;
+    if (!noCp[shop] && !(r && r.bulkOperation)) { noCp[shop] = true; const j2 = await gql(shop, token, "mutation($q: String!) { bulkOperationRunQuery(query: $q) { bulkOperation { id status } userErrors { field message } } }", { q: BULK_QUERY }); r = j2 && j2.data && j2.data.bulkOperationRunQuery; }
+    if (r && r.bulkOperation) { ops[shop] = { id: r.bulkOperation.id, startedAt: Date.now(), lastPoll: 0, cp: !noCp[shop] }; await dbSet(kOp(shop), ops[shop]); return ops[shop]; }
     ops[shop] = { id: null, startedAt: Date.now(), lastPoll: Date.now(), error: JSON.stringify((r && r.userErrors) || (j && j.errors) || "unknown").slice(0, 300) };
     return null;
   }
@@ -639,6 +690,7 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
       await dbSet(kCat(shop), persist);
       return cat;
     }
+    if (n.status === "FAILED" && op.cp) noCp[shop] = true; // BOKO CTL3LIVE: no access to the colour field -> plain query next time
     if (["FAILED", "CANCELED", "EXPIRED"].includes(n.status) || Date.now() - op.startedAt > OP_MAX) { delete ops[shop]; await dbSet(kOp(shop), null); }
     return null;
   }
@@ -664,11 +716,13 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
   }
   async function fetchAnchor(shop, token, anum) {
     try {
-      const j = await gql(shop, token, ANCHOR_QUERY, { id: "gid://shopify/Product/" + anum });
+      let j = noCp[shop] ? null : await gql(shop, token, ANCHOR_QUERY_CP, { id: "gid://shopify/Product/" + anum }); // BOKO CTL3LIVE
+      if (!j || j.errors || !(j.data && j.data.product)) j = await gql(shop, token, ANCHOR_QUERY, { id: "gid://shopify/Product/" + anum });
       const n = j && j.data && j.data.product;
       if (!n) return null;
+      const cpl = ((n.metafield && n.metafield.references && n.metafield.references.nodes) || []).map(x => x && x.field && x.field.value).filter(Boolean).map(v => String(v).trim()); // BOKO CTL3LIVE
       const colls = (n.collections.nodes || []).map(c => ({ id: c.id, handle: c.handle }));
-      const p = compactProduct({ ...n, publishedAt: n.publishedAt || n.createdAt }, colls, n.variants.nodes || [], n.options || []);
+      const p = compactProduct({ ...n, publishedAt: n.publishedAt || n.createdAt }, colls, n.variants.nodes || [], n.options || [], cpl);
       if (p) return p;
       // sold-out anchor is still usable as an anchor
       const v = (n.variants.nodes || [])[0] || {};
@@ -676,9 +730,41 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
       return { id: anum, handle: n.handle, title: n.title, category: (n.productType || "").toLowerCase(), tags: n.tags || [],
         tagsLc: (n.tags || []).map(t => String(t).toLowerCase()), cols: canonicalCols(colls.map(c => c.handle), n.productType, n.title, n.tags || []),
         price: parseFloat(v.price) || 0, color: String(col).toLowerCase() || colorFromTitle(n.title), sizes: [], createdAt: n.createdAt,
-        pattern: TITLE_PRINT_RE.test(String(n.title || "").toLowerCase()) };
+        pattern: TITLE_PRINT_RE.test(String(n.title || "").toLowerCase()), cp: cpl };
     } catch (e) { return null; }
   }
+
+  // BOKO CTL3LIVE (CTL2-COLOR): Complete the Look picks for Klaviyo (sync, post-purchase, feed). Fashion shops only;
+  // returns null for sector shops / no result so the Klaviyo code keeps its existing cache logic.
+  globalThis.__ctl2Pick = async function (shop, productId, limit, excludeIds) {
+    try {
+      const anum = String(productId || "").split("/").pop().replace(/\D/g, "");
+      if (!shop || !anum) return null;
+      if (getIndustry && (await getIndustry(shop))) return null;
+      const token = await getToken(shop);
+      if (!token) return null;
+      if (billingOK && !(await billingOK(shop, token))) return null;
+      const cat = await getCatalog(shop, token, 8000);
+      if (!cat) return null;
+      const anchor = cat.byId.get(anum) || await fetchAnchor(shop, token, anum);
+      if (!anchor) return null;
+      let pool = cat.products;
+      try {
+        const st = loadSettings ? await loadSettings(shop) : null;
+        const exc = new Set((st && st.global && st.global.excludedCollections) || []);
+        if (exc.size) pool = pool.filter(p => !(p.collGids || []).some(id => exc.has(id)));
+      } catch (e) {}
+      const ex = new Set((excludeIds || []).map(x => String(x).split("/").pop().replace(/\D/g, "")));
+      if (ex.size) pool = pool.filter(p => !ex.has(String(p.id)));
+      pool = ctl3GenderPool(pool, anchor); // LIVE
+      const v3 = CTL_DEFAULT_ENGINE === 3;
+      const tot = Math.max(1, Math.min(8, limit || 4));
+      const r = v3 ? completeTheLook3(pool, anchor, { total: tot }) : completeTheLook(pool, anchor, { total: tot });
+      if (!r.items.length) return null;
+      const shape = it => ({ id: String(it.id).split("/").pop(), title: it.title, handle: it.handle, price: it.price, image: it.img || "", url: "https://" + shop + "/products/" + it.handle });
+      return { anchor: { id: anum, title: anchor.title || "", handle: anchor.handle || "", price: anchor.price || 0, image: anchor.img || "" }, items: r.items.map(shape), algo: v3 ? "ctl3" : "ctl2-color", at: new Date().toISOString() };
+    } catch (e) { return null; }
+  };
 
   app.get("/proxy/ctl", async (req, res) => {
     const q = req.query;
@@ -707,6 +793,13 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
           const ex = new Set((st && st.global && st.global.excludedCollections) || []);
           if (ex.size) products = products.filter(p => !(p.collGids || []).some(id => ex.has(id)));
         } catch (e) {}
+        // BOKO CTL3LIVE: stylist engine (?engine=3 / ?engine=2 to compare; CTL_DEFAULT_ENGINE picks the default)
+        if (q.engine === "3" || (q.engine !== "2" && CTL_DEFAULT_ENGINE === 3)) {
+          const r3 = completeTheLook3(ctl3GenderPool(products, anchor), anchor, { total: limit, acolor: String(q.acolor || "").toLowerCase() }); // LIVE: gender gate
+          const body3 = { engine: "ctl3", items: ctl3Enrich(r3.items, cat) }; // LIVE: options/variants for the block
+          if (debug) body3.meta = { ...r3.meta, anchor_cols: anchor.cols, catalog_size: cat.products.length, catalog_age_s: Math.round((Date.now() - cat.at) / 1000), colour_field: !noCp[shop], op: ops[shop] || null };
+          return res.status(200).send(JSON.stringify(body3));
+        }
         const r = completeTheLook(products, anchor, { total: limit, days, acolor: String(q.acolor || "").toLowerCase() });
         if (r.items.length) {
           const body = { engine: "ctl2", items: r.items };
@@ -715,6 +808,7 @@ export function mountCtl2(app, { verifyProxy, getToken, gql, db, billingOK, getI
           return res.status(200).send(JSON.stringify(body));
         }
       }
+      if (q.engine === "3" || (q.engine !== "2" && CTL_DEFAULT_ENGINE === 3)) return res.status(200).send(JSON.stringify({ engine: "ctl3", items: [], ...(debug ? { meta: { reason: !cat ? "catalogue building" : "anchor not found", op: ops[shop] || null } } : {}) })); // BOKO CTL3LIVE (P7)
       if (debug) res.set("X-Boko-Ctl", !cat ? "catalogue-building" : !anchor ? "anchor-not-found" : "no-v2-results");
       return fallback(req, res);
     } catch (e) {

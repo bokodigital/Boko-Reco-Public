@@ -121,12 +121,12 @@
     var url="?type=recommended&limit="+limit+(anchor?"&anchor="+encodeURIComponent(anchor):"")+(aType?"&atype="+encodeURIComponent(aType):"")+(aTitle?"&atitle="+encodeURIComponent(aTitle):"")+(aTags?"&atags="+encodeURIComponent(aTags):"")+(aPrice?"&aprice="+encodeURIComponent(aPrice):"");
     function list(u){return fetch(u,{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){return (d.items||[]).slice(0,limit);}).catch(function(){return [];});}
     if(!ctl)return list(proxy+url);
-    return list(ctl+url+(aColor?"&acolor="+encodeURIComponent(aColor):"")).then(function(items){return items.length?items:list(proxy+url);});
+    /* BOKO-CTL3-BLOCK V7 */return fetch(ctl+url+(aColor?"&acolor="+encodeURIComponent(aColor):""),{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){var it=(d.items||[]).slice(0,limit);if(d.engine==="ctl3")return it;return it.length?it:list(proxy+url);}).catch(function(){return list(proxy+url);});
   }
-  function firstAvail(p){for(var i=0;i<(p.variants||[]).length;i++)if(p.variants[i].available)return p.variants[i];return (p.variants||[])[0]||{id:p.variantId,price:p.price,options:[],available:true};}
+  function firstAvail(p){for(var j=0;j<(p.variants||[]).length;j++)if(String(p.variants[j].id)===String(p.variantId)&&p.variants[j].available)return p.variants[j];for(var i=0;i<(p.variants||[]).length;i++)if(p.variants[i].available)return p.variants[i];return (p.variants||[])[0]||{id:p.variantId,price:p.price,options:[],available:true};}
   function variantFor(p,sel){for(var i=0;i<p.variants.length;i++){var v=p.variants[i],ok=true;for(var k=0;k<sel.length;k++){if(sel[k]!=null&&v.options[k]!==sel[k]){ok=false;break;}}if(ok)return v;}return null;}
 
-  function optionsHTML(p){
+  function optionsHTML(p,fv){var fo=(fv&&fv.options)||[];
     if(!p.options||!p.variants||p.options.length===0)return "";
     var out="<div class='boko-ctl__ropts'>";
     for(var oi=0;oi<p.options.length;oi++){
@@ -134,7 +134,7 @@
       out+="<div class='boko-ctl__rchiprow' data-opt-row='"+oi+"'>";
       for(var vi=0;vi<o.values.length;vi++){
         var val=o.values[vi];
-        out+="<button type='button' class='boko-ctl__chip"+(isColour?" boko-ctl__dot":"")+(vi===0?" is-sel":"")+"' data-opt='"+oi+"' data-val='"+esc(val)+"'"+(isColour?" style=\"background:"+esc(val.toLowerCase().replace(/[^a-z]/g,''))+"\" title='"+esc(val)+"'":"")+">"+(isColour?"":esc(val))+"</button>";
+        out+="<button type='button' class='boko-ctl__chip"+(isColour?" boko-ctl__dot":"")+((fo[oi]!=null?val===fo[oi]:vi===0)?" is-sel":"")+"' data-opt='"+oi+"' data-val='"+esc(val)+"'"+(isColour?" style=\"background:"+esc(val.toLowerCase().replace(/[^a-z]/g,''))+"\" title='"+esc(val)+"'":"")+">"+(isColour?"":esc(val))+"</button>";
       }
       out+="</div>";
     }
@@ -156,11 +156,11 @@
           (p.vendor?"<div class='boko-ctl__vendor'>"+esc(p.vendor)+"</div>":"")+
           "<div class='boko-ctl__rtitle'>"+(purl?"<a class='boko-ctl__titlelink' href='"+purl+"'>"+esc(p.title)+"</a>":esc(p.title))+"</div>"+
           "<div class='boko-ctl__rprice' data-rprice>"+money(fv.price)+"</div>"+
-          optionsHTML(p)+
+          optionsHTML(p,fv)+
         "</div>"+
       "</div>");
     var sel=(p.options||[]).map(function(_,i){return fv.options?fv.options[i]:null;});
-    function resolve(){var v=variantFor(p,sel)||fv;var pr=c.querySelector("[data-rprice]");if(pr)pr.textContent=money(v.price);c._variant=v;return v;}
+    function resolve(){var v=variantFor(p,sel)||fv;var pr=c.querySelector("[data-rprice]");if(pr)pr.textContent=money(v.price);if(v.img){var gi=c.querySelector(".boko-ctl__imgwrap img");if(gi){gi.removeAttribute("srcset");gi.src=v.img;}}c._variant=v;return v;}
     c._variant=fv;
     c.querySelectorAll(".boko-ctl__chip").forEach(function(ch){
       ch.addEventListener("click",function(){var oi=parseInt(ch.getAttribute("data-opt"),10);sel[oi]=ch.getAttribute("data-val");ch.closest(".boko-ctl__rchiprow").querySelectorAll(".boko-ctl__chip").forEach(function(x){x.classList.remove("is-sel");});ch.classList.add("is-sel");resolve();});
