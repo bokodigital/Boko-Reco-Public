@@ -159,5 +159,24 @@ const P = (id, o = {}) => ({ id, title: o.title || ("P" + id), price: o.price ||
   ok(!ids(r).includes(4), "home: decor ordered last (dropped when limit is tight)");
 }
 
+// ---------- 14. Backfill: same-role alternatives only after every role's first pick ----------
+{
+  const anchor = P(1, { role: "cleanse", title: "Gel Cleanser" });
+  const products = [
+    P(2, { role: "cleanse", title: "Cream Cleanser" }),   // anchor's own role -> never
+    P(3, { role: "tone", title: "Toner A" }),
+    P(4, { role: "tone", title: "Toner B" }),             // valid second toner -> backfill
+    P(5, { role: "treat", title: "Serum" }),
+    P(6, { role: "moisturise", title: "Moisturiser" }),
+    P(7, { role: "protect", title: "SPF 50" }),
+  ];
+  const r = await recommendForShop({ products, anchor, industry: "Beauty", limit: 8 });
+  const rid = ids(r);
+  ok(rid.includes(3) && rid.includes(4), "backfill: returns both valid toners when under limit");
+  ok(!rid.includes(2), "backfill: never adds the anchor's own role");
+  const secondToner = Math.max(rid.indexOf(3), rid.indexOf(4));
+  ok([5, 6, 7].every((id) => rid.includes(id) && rid.indexOf(id) < secondToner), "backfill: every other role's first pick precedes the second toner");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
