@@ -1,18 +1,19 @@
 {%- if block.settings.enabled -%}
-<style> .boko-cc{--ink:#2b2b2b;--muted:#8a8a8a;--line:#e6e6e6;font-family:inherit;color:var(--ink);margin:16px 0;border-top:1px solid var(--line);padding-top:14px}.boko-cc .bcc-h{font-size:{{ block.settings.heading_size }}px;letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin:0 0 10px;font-weight:500}.boko-cc .bcc-stage{position:relative;display:flex;align-items:center;gap:8px}.boko-cc .bcc-nav{flex:0 0 36px;width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;min-height:36px!important;padding:0!important;margin:0;border:1px solid var(--line);background:#fff;border-radius:50%!important;cursor:pointer;font-size:16px;line-height:1;color:var(--ink);display:flex;align-items:center;justify-content:center;box-sizing:border-box;aspect-ratio:1/1;flex-shrink:0}.boko-cc .bcc-nav:hover{border-color:var(--ink)}.boko-cc .bcc-track{flex:1;overflow:hidden}.boko-cc .bcc-slides{display:flex;transition:transform .3s ease}.boko-cc .bcc-slide{flex:0 0 100%;display:flex;gap:12px;align-items:center;padding:4px}.boko-cc .bcc-img{flex:0 0 76px;width:76px;height:90px;object-fit:cover;background:#f3f1ee;border-radius:6px}.boko-cc .bcc-info{flex:1;min-width:0}.boko-cc .bcc-title{font-size:{{ block.settings.body_size }}px;line-height:1.3;margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.boko-cc .bcc-titlelink{color:inherit;text-decoration:none}.boko-cc .bcc-titlelink:hover{text-decoration:underline}.boko-cc .bcc-imglink{display:block}.boko-cc .bcc-price{font-size:{{ block.settings.body_size }}px;font-weight:600;margin-bottom:8px}.boko-cc .bcc-add{border:none;background:#1f1f1f;color:#fff;font-family:inherit;font-size:12px;line-height:1;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;border-radius:6px;cursor:pointer}.boko-cc .bcc-add.added{background:#3f8f5f}.boko-cc .bcc-dots{display:flex;gap:5px;justify-content:center;margin-top:10px}.boko-cc .bcc-dot{width:6px;height:6px;border-radius:50%;background:var(--line);border:none;padding:0;cursor:pointer}.boko-cc .bcc-dot.on{background:var(--ink)}.boko-cc .bcc-empty{color:var(--muted);font-size:12px;text-align:center;padding:10px}.boko-cc .bcc-opts{display:flex;flex-direction:column;gap:4px;margin:6px 0 8px}.boko-cc .bcc-opt{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.boko-cc .bcc-optlabel{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;width:100%}.boko-cc .bcc-sw{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:11px;padding:3px 7px;border-radius:3px;cursor:pointer;line-height:1}.boko-cc .bcc-sw:hover{border-color:var(--ink)}.boko-cc .bcc-sw.is-sel{background:#1f1f1f;color:#fff;border-color:#1f1f1f}.boko-cc .bcc-sw.is-oos{opacity:.4;text-decoration:line-through;cursor:not-allowed}</style>
+<style> .boko-cc{--ink:#2b2b2b;--muted:#8a8a8a;--line:#e6e6e6;font-family:inherit;color:var(--ink);margin:16px 0;border-top:1px solid var(--line);padding-top:14px}.boko-cc .bcc-h{font-size:{{ block.settings.heading_size }}px;letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin:0 0 10px;font-weight:500}.boko-cc .bcc-stage{position:relative;display:flex;align-items:center;gap:8px}.boko-cc .bcc-nav{flex:0 0 36px;width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;min-height:36px!important;padding:0!important;margin:0;border:1px solid var(--line);background:#fff;border-radius:50%!important;cursor:pointer;font-size:16px;line-height:1;color:var(--ink);display:flex;align-items:center;justify-content:center;box-sizing:border-box;aspect-ratio:1/1;flex-shrink:0}.boko-cc .bcc-nav:hover{border-color:var(--ink)}.boko-cc .bcc-track{flex:1;overflow:hidden}.boko-cc .bcc-slides{display:flex;transition:transform .3s ease}.boko-cc .bcc-slide{flex:0 0 100%;display:flex;gap:12px;align-items:center;padding:4px}.boko-cc .bcc-img{flex:0 0 76px;width:76px;height:90px;object-fit:cover;background:#f3f1ee;border-radius:6px}.boko-cc .bcc-info{flex:1;min-width:0}.boko-cc .bcc-title{font-size:{{ block.settings.body_size }}px;line-height:1.3;margin:0 0 4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.boko-cc .bcc-titlelink{color:inherit;text-decoration:none}.boko-cc .bcc-titlelink:hover{text-decoration:underline}.boko-cc .bcc-imglink{display:block}.boko-cc .bcc-price{font-size:{{ block.settings.body_size }}px;font-weight:600;margin-bottom:8px}.boko-cc .bcc-add{border:none;background:#1f1f1f;color:#fff;font-family:inherit;font-size:12px;line-height:1;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;border-radius:6px;cursor:pointer}.boko-cc .bcc-add.added{background:#3f8f5f}.boko-cc .bcc-dots{display:flex;gap:5px;justify-content:center;margin-top:10px}.boko-cc .bcc-dot{width:6px;height:6px;border-radius:50%;background:var(--line);border:none;padding:0;cursor:pointer}.boko-cc .bcc-dot.on{background:var(--ink)}.boko-cc .bcc-empty{color:var(--muted);font-size:12px;text-align:center;padding:10px}.boko-cc .bcc-opts{display:flex;flex-direction:column;gap:4px;margin:6px 0 8px}.boko-cc .bcc-opt{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.boko-cc .bcc-optlabel{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;width:100%}.boko-cc .bcc-sw{border:1px solid var(--line);background:#fff;color:var(--ink);font:inherit;font-size:11px;padding:3px 7px;border-radius:3px;cursor:pointer;line-height:1}.boko-cc .bcc-sw:hover{border-color:var(--ink)}.boko-cc .bcc-sw.is-sel{background:#1f1f1f;color:#fff;border-color:#1f1f1f}.boko-cc .bcc-sw.is-oos{opacity:.4;text-decoration:line-through;cursor:not-allowed}.boko-cc .bcc-sr{position:absolute !important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
 
 <template id="boko-cc-tpl">
-  <div class="boko-cc" data-boko-cc
+  <div class="boko-cc" data-boko-cc role="region" aria-label="{{ block.settings.title | escape }}"
        data-proxy="/apps/reco/recommend"
        data-count="{{ block.settings.count }}"
        data-autoplay="{{ block.settings.autoplay }}">
     <p class="bcc-h">{{ block.settings.title | escape }}</p>
     <div class="bcc-stage">
-      <button class="bcc-nav" data-prev aria-label="Previous">&#8249;</button>
-      <div class="bcc-track"><div class="bcc-slides" data-slides><div class="bcc-empty">Loading…</div></div></div>
-      <button class="bcc-nav" data-next aria-label="Next">&#8250;</button>
+      <button type="button" class="bcc-nav" data-prev aria-label="Previous recommendation">&#8249;</button>
+      <div class="bcc-track"><div class="bcc-slides" data-slides aria-busy="true"><div class="bcc-empty">Loading…</div></div></div>
+      <button type="button" class="bcc-nav" data-next aria-label="Next recommendation">&#8250;</button>
     </div>
     <div class="bcc-dots" data-dots></div>
+    <div class="bcc-sr" role="status" aria-live="polite" data-cc-live></div>
   </div>
 </template>
 
@@ -38,6 +39,7 @@
 
   function money(n){return "$"+Number(n).toFixed(2);}
   function vnum(g){var m=String(g).match(/(\d+)$/);return m?m[1]:g;}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];});}
   function setCount(n){try{document.querySelectorAll(".cart-link__count,.cart-count-bubble,.cart-count,[data-cart-count],#CartCount,.cart-link__bubble,.cart-count-number,[data-cart-item-count],.cart-counter,.cart__count").forEach(function(e){var t=e.querySelector("span")||e;if(/^\s*\d+\s*$/.test(t.textContent||""))t.textContent=n;});}catch(e){}}
 
   function variantFor(p,sel){for(var i=0;i<p.variants.length;i++){var v=p.variants[i],ok=true;for(var k=0;k<sel.length;k++){if(sel[k]!=null&&v.options[k]!==sel[k]){ok=false;break;}}if(ok)return v;}return null;}
@@ -54,23 +56,25 @@
     var autoplay=parseInt(root.getAttribute("data-autoplay")||"0",10);
     var slides=root.querySelector("[data-slides]"), dots=root.querySelector("[data-dots]");
     var items=[], idx=0, timer=null, cartIds={}, busy=false;
+    /* announce cart results to screen readers / AI agents (visible text is unchanged) */
+    function say(m){var l=root.querySelector("[data-cc-live]");if(!l)return;l.textContent="";setTimeout(function(){l.textContent=m;},60);}
   {% render 'boko-cr-beacon' %}
-    function go(i){ if(!items.length)return; idx=(i+items.length)%items.length; slides.style.transform="translateX("+(-idx*100)+"%)"; dots.querySelectorAll(".bcc-dot").forEach(function(d,k){d.classList.toggle("on",k===idx);}); }
+    function go(i){ if(!items.length)return; idx=(i+items.length)%items.length; slides.style.transform="translateX("+(-idx*100)+"%)"; dots.querySelectorAll(".bcc-dot").forEach(function(d,k){d.classList.toggle("on",k===idx);if(k===idx)d.setAttribute("aria-current","true");else d.removeAttribute("aria-current");}); }
     function stop(){ if(timer){clearInterval(timer);timer=null;} }
     function start(){ stop(); if(autoplay>0 && items.length>1){ timer=setInterval(function(){go(idx+1);}, autoplay*1000); } }
     function bokoGenericSync(){try{var sec=document.querySelector("[id^=shopify-section-][id*=cart-drawer]");if(sec){var sid=sec.id.replace(/^shopify-section-/,"");fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:[sid],sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{var h=js&&js.sections&&js.sections[sid];if(!h)return;var t=document.createElement("div");t.innerHTML=h;var fresh=t.querySelector("#"+sec.id)||t.firstElementChild;if(fresh)sec.innerHTML=fresh.innerHTML;}catch(e){}}).catch(function(){});}}catch(e){}try{document.dispatchEvent(new CustomEvent("cart:update",{bubbles:true,detail:{source:"boko"}}));}catch(e){}}
       function bokoSyncDrawer(){try{var cd=document.querySelector("cart-drawer");if(!cd||!cd.getSectionsToRender){bokoGenericSync();return;}var sec=cd.getSectionsToRender().map(function(s){return s.id;});fetch("/cart/update.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({updates:{},sections:sec,sections_url:location.pathname})}).then(function(r){return r.json();}).then(function(js){try{cd.renderContents(js);}catch(e){}var L=["#CartDrawer",".drawer__inner","cart-drawer-items",".cart-drawer"];for(var i=0;i<L.length;i++){var n=document.querySelector(L[i]);if(n)n.classList.remove("is-empty");}cd.classList.remove("is-empty");});}catch(e){}}
-      function addToCart(v,btn){
+      function addToCart(v,btn,title){
       fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[{id:vnum(v),quantity:1,properties:{"_boko_reco":"cart_drawer"}}]})})
         .then(function(r){if(!r.ok)throw 0;return r.json();})
-        .then(function(){ if(btn){btn.textContent="Added";btn.classList.add("added");} bokoSyncDrawer();document.dispatchEvent(new CustomEvent("boko:cart:added")); refresh(); })
-        .catch(function(){ if(btn)btn.textContent="Try again"; });
+        .then(function(){ if(btn){btn.textContent="Added";btn.classList.add("added");} say("Added "+(title||"item")+" to cart"); bokoSyncDrawer();document.dispatchEvent(new CustomEvent("boko:cart:added")); refresh(); })
+        .catch(function(){ if(btn)btn.textContent="Try again"; say("Couldn't add "+(title||"item")+" to cart. Please try again."); });
     }
     function makeSlide(p){
-      var s=document.createElement("div"); s.className="bcc-slide";
+      var s=document.createElement("div"); s.className="bcc-slide"; s.setAttribute("role","group"); s.setAttribute("aria-label",p.title||"");
       var purl=p.handle?("/products/"+encodeURIComponent(p.handle)):null;
-      s.innerHTML=(p.img?((purl?"<a class='bcc-imglink' href='"+purl+"'>":"")+"<img class='bcc-img' src='"+p.img+"' alt=''>"+(purl?"</a>":"")):"<div class='bcc-img'></div>")+
-        "<div class='bcc-info'><div class='bcc-title'>"+(purl?"<a class='bcc-titlelink' href='"+purl+"'>"+p.title+"</a>":p.title)+"</div><div class='bcc-price'>"+money(p.price)+"</div><div class='bcc-opts'></div><button class='bcc-add'>Add to cart</button></div>";
+      s.innerHTML=(p.img?((purl?"<a class='bcc-imglink' href='"+purl+"' aria-label='"+esc(p.title)+"'>":"")+"<img class='bcc-img' src='"+p.img+"' alt=''>"+(purl?"</a>":"")):"<div class='bcc-img'></div>")+
+        "<div class='bcc-info'><div class='bcc-title'>"+(purl?"<a class='bcc-titlelink' href='"+purl+"'>"+p.title+"</a>":p.title)+"</div><div class='bcc-price'>"+money(p.price)+"</div><div class='bcc-opts'></div><button type='button' class='bcc-add' aria-label='Add "+esc(p.title)+" to cart'>Add to cart</button></div>";
       var priceEl=s.querySelector(".bcc-price"),optsEl=s.querySelector(".bcc-opts"),addBtn=s.querySelector(".bcc-add");
       var vid=p.variantId;
       var hasV=p.options&&p.options.length&&p.variants&&p.variants.length>1;
@@ -80,32 +84,33 @@
         var draw=function(){
           optsEl.innerHTML="";
           p.options.forEach(function(opt,oi){
-            var row=document.createElement("div");row.className="bcc-opt";
-            var lab=document.createElement("span");lab.className="bcc-optlabel";lab.textContent=opt.name;row.appendChild(lab);
+            var row=document.createElement("div");row.className="bcc-opt";row.setAttribute("role","group");row.setAttribute("aria-label",opt.name);
+            var lab=document.createElement("span");lab.className="bcc-optlabel";lab.textContent=opt.name;lab.setAttribute("aria-hidden","true");row.appendChild(lab);
             opt.values.forEach(function(val){
               var b=document.createElement("button");b.type="button";
               var on=sel[oi]===val,av=valAvail(p,oi,val,sel);
               b.className="bcc-sw"+(on?" is-sel":"")+(av?"":" is-oos");
-              b.textContent=val;
+              b.textContent=val;b.setAttribute("aria-pressed",on?"true":"false");b.setAttribute("aria-label",opt.name+": "+val+(av?"":" (sold out)"));
               b.addEventListener("click",function(){if(!av&&!on)return;sel[oi]=val;var v=variantFor(p,sel);if(v){vid=v.id;priceEl.textContent=money(v.price);addBtn.disabled=!v.available;addBtn.textContent=v.available?"Add to cart":"Sold out";}draw();});
               row.appendChild(b);
             });
             optsEl.appendChild(row);
           });
-          var cur=variantFor(p,sel);if(cur){addBtn.disabled=!cur.available;addBtn.textContent=cur.available?"Add to cart":"Sold out";}
+          var cur=variantFor(p,sel);if(cur){addBtn.disabled=!cur.available;addBtn.textContent=cur.available?"Add to cart":"Sold out";var vt=(cur.options||[]).filter(Boolean).join(" / ");addBtn.setAttribute("aria-label",cur.available?"Add "+p.title+(vt?" ("+vt+")":"")+" to cart":p.title+(vt?" ("+vt+")":"")+" is sold out");}
         };
         draw();
       }
-      addBtn.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,this);});
+      addBtn.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,this,p.title);});
       return s;
     }
     function render(){
       stop();
+      slides.removeAttribute("aria-busy");
       if(!items.length){ slides.innerHTML="<div class='bcc-empty'>No recommendations right now.</div>"; dots.innerHTML=""; return; }
       slides.innerHTML="";
       items.forEach(function(p){ slides.appendChild(makeSlide(p)); });
       try{if(!window.__bokoCRcart){window.__bokoCRcart=1;bokoCR("imp");bokoCRAttr();}}catch(e){}
-      dots.innerHTML=items.map(function(_,k){return "<button class='bcc-dot"+(k===0?" on":"")+"' data-d='"+k+"'></button>";}).join("");
+      dots.innerHTML=items.map(function(p,k){return "<button type='button' class='bcc-dot"+(k===0?" on":"")+"' data-d='"+k+"' aria-label='Show recommendation "+(k+1)+" of "+items.length+": "+esc(p.title)+"'></button>";}).join("");
       dots.querySelectorAll(".bcc-dot").forEach(function(d){d.addEventListener("click",function(){go(+d.dataset.d);start();});});
       idx=0; go(0); start();
     }
@@ -113,7 +118,7 @@
       var url=proxy+"?type=recommended&limit="+(count+5);
       return fetch(url,{headers:{Accept:"application/json"}}).then(function(r){return r.json();})
         .then(function(d){ items=(d.items||[]).filter(function(p){return p.variantId && !cartIds[vnum(p.variantId)];}).slice(0,count); render(); })
-        .catch(function(){ slides.innerHTML="<div class='bcc-empty'>Couldn't load.</div>"; });
+        .catch(function(){ slides.removeAttribute("aria-busy"); slides.innerHTML="<div class='bcc-empty'>Couldn't load.</div>"; });
     }
     function refresh(){
       if(busy)return; busy=true;

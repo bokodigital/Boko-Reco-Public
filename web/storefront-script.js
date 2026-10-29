@@ -29,6 +29,12 @@ const STOREFRONT_JS = `(function(){
   function vnum(g){var m=String(g).match(/(\\d+)$/);return m?m[1]:g;}
   function money(n){return "$"+Number(n).toFixed(2);}
   function el(h){var d=document.createElement("div");d.innerHTML=h.trim();return d.firstChild;}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  /* agent / screen-reader only status line inside each widget; visible text is unchanged */
+  var SR_HTML="<div role='status' aria-live='polite' data-boko-live style='position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0'></div>";
+  function say(from,m){var r=from&&from.closest&&from.closest("#boko-rail,[data-boko-cart]");var l=r&&r.querySelector("[data-boko-live]");if(!l)return;l.textContent="";setTimeout(function(){l.textContent=m;},60);}
+  function a11yOptions(row,opt,b,val,on,av){row.setAttribute("role","group");row.setAttribute("aria-label",opt.name);b.setAttribute("aria-pressed",on?"true":"false");b.setAttribute("aria-label",opt.name+": "+val+(av?"":" (sold out)"));}
+  function a11yAdd(btn,p,cur){var vt=cur?(cur.options||[]).filter(Boolean).join(" / "):"";btn.setAttribute("aria-label",(!cur||cur.available)?"Add "+(p.title||"item")+(vt?" ("+vt+")":"")+" to cart":(p.title||"item")+(vt?" ("+vt+")":"")+" is sold out");}
 
   function getConfig(){
     if(window.__bokoConfigPromise) return window.__bokoConfigPromise;
@@ -51,7 +57,7 @@ function showCart(json){
     }
     fetch("/cart.js",{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(c){cartNotify(c.item_count||0);}).catch(function(){cartNotify(0);});
   }
-  function addToCart(variantId,tag,btn,handle){
+  function addToCart(variantId,tag,btn,handle,title){
     if(btn)btn.disabled=true;
     sendTrack("add",tag.value,handle);
     var props={};props[tag.key]=tag.value;
@@ -61,9 +67,10 @@ function showCart(json){
       .then(function(r){if(!r.ok)return r.json().then(function(e){throw e;});return r.json();})
       .then(function(json){
         if(btn){btn.textContent="Added \\u2713";btn.classList.add("is-added");setTimeout(function(){btn.textContent=btn.dataset.label||"Add to cart";btn.classList.remove("is-added");btn.disabled=false;},1600);}
+        say(btn,"Added "+(title||"item")+" to cart");
         showCart(json);
       })
-      .catch(function(e){if(btn){btn.textContent="Unavailable";setTimeout(function(){btn.textContent=btn.dataset.label||"Add to cart";btn.disabled=false;},1600);}console.warn("[boko]",e);});
+      .catch(function(e){say(btn,"Couldn't add "+(title||"item")+" to cart.");if(btn){btn.textContent="Unavailable";setTimeout(function(){btn.textContent=btn.dataset.label||"Add to cart";btn.disabled=false;},1600);}console.warn("[boko]",e);});
   }
   function variantFor(p,sel){for(var i=0;i<p.variants.length;i++){var v=p.variants[i],ok=true;for(var k=0;k<sel.length;k++){if(sel[k]!=null&&v.options[k]!==sel[k]){ok=false;break;}}if(ok)return v;}return null;}
   function firstAvail(p){for(var i=0;i<p.variants.length;i++){if(p.variants[i].available)return p.variants[i];}return p.variants[0];}
@@ -80,7 +87,7 @@ function showCart(json){
     return null;
   }
   function railCard(p,cfg){
-    var c=el("<div class='boko-rail__card'><div class='boko-rail__imgwrap'>"+(p.img?"<img loading='lazy' src='"+p.img+"' alt=''>":"")+"<button class='boko-rail__atc' data-label='"+ (cfg.addText?"Add to cart":"Add to cart") +"'>Add to cart</button></div><div class='boko-rail__body'><div class='boko-rail__title'></div><div class='boko-rail__price'></div><div class='boko-rail__opts'></div></div></div>");
+    var c=el("<div class='boko-rail__card' role='group' aria-label='"+esc(p.title)+"'><div class='boko-rail__imgwrap'>"+(p.img?"<img loading='lazy' src='"+p.img+"' alt=''>":"")+"<button type='button' class='boko-rail__atc' aria-label='Add "+esc(p.title)+" to cart' data-label='"+ (cfg.addText?"Add to cart":"Add to cart") +"'>Add to cart</button></div><div class='boko-rail__body'><div class='boko-rail__title'></div><div class='boko-rail__price'></div><div class='boko-rail__opts'></div></div></div>");
     var titleEl=c.querySelector(".boko-rail__title");
     if(p.handle){var a=document.createElement("a");a.href="/products/"+p.handle;a.style.color="inherit";a.style.textDecoration="none";a.textContent=p.title||"";a.addEventListener("click",function(){sendTrack("click","pdp",p.handle);});titleEl.appendChild(a);}
     else{titleEl.textContent=p.title||"";}
@@ -98,17 +105,17 @@ function showCart(json){
           opt.values.forEach(function(val){
             var b=document.createElement("button");b.type="button";
             var on=sel[oi]===val,av=valAvail(p,oi,val,sel);
-            b.className="boko-rail__sw"+(on?" is-sel":"")+(av?"":" is-oos");b.textContent=val;
+            b.className="boko-rail__sw"+(on?" is-sel":"")+(av?"":" is-oos");b.textContent=val;a11yOptions(row,opt,b,val,on,av);
             b.addEventListener("click",function(){if(!av&&!on)return;sel[oi]=val;var v=variantFor(p,sel);if(v){vid=v.id;priceEl.textContent=money(v.price);atc.disabled=!v.available;atc.textContent=v.available?"Add to cart":"Sold out";}draw();});
             row.appendChild(b);
           });
           optsEl.appendChild(row);
         });
-        var cur=variantFor(p,sel);if(cur){atc.disabled=!cur.available;atc.textContent=cur.available?"Add to cart":"Sold out";}
+        var cur=variantFor(p,sel);if(cur){atc.disabled=!cur.available;atc.textContent=cur.available?"Add to cart":"Sold out";a11yAdd(atc,p,cur);}
       };
       draw();
     }
-    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"pdp"},this,p.handle);});
+    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"pdp"},this,p.handle,p.title);});
     return c;
   }
   function fontStack(name){if(!name||name==="Default")return "inherit";return "'"+name+"', sans-serif";}
@@ -160,7 +167,7 @@ function showCart(json){
     if(document.getElementById("boko-rail"))return;
     injectRailStyles();
     var host=findRailHost();
-    var root=el("<div id='boko-rail' class='boko-rail'><h2 class='boko-rail__title'>You may also like</h2><div class='boko-rail__grid'><div class='boko-rail__loading'>Loading\\u2026</div></div></div>");
+    var root=el("<div id='boko-rail' class='boko-rail'><h2 class='boko-rail__title'>You may also like</h2><div class='boko-rail__grid' aria-busy='true'><div class='boko-rail__loading'>Loading\\u2026</div></div>"+SR_HTML+"</div>");
     host.appendChild(root);
     getConfig().then(function(cfg){
       var s=styleRail(root,cfg);
@@ -168,7 +175,7 @@ function showCart(json){
       return fetch(url,{headers:{Accept:"application/json"}}).then(function(r){return r.json();}).then(function(d){return d.items||[];});
     }).catch(function(){return [];}).then(function(items){
       var grid=root.querySelector(".boko-rail__grid");
-      grid.innerHTML="";
+      grid.innerHTML="";grid.removeAttribute("aria-busy");
       if(!items||!items.length){root.remove();return;}
       items.forEach(function(p){if(p.variantId)grid.appendChild(railCard(p,{}));});
     });
@@ -216,7 +223,7 @@ function showCart(json){
     var s=document.createElement("style");s.id="boko-cart-style";s.textContent=css;document.head.appendChild(s);
   }
   function cartCard(p){
-    var c=el("<div class='boko-cart__slide'><a class='boko-cart__img'></a><div class='boko-cart__info'><div class='boko-cart__row1'><span class='boko-cart__title'></span><span class='boko-cart__price'></span></div><div class='boko-cart__opts'></div><button class='boko-cart__add' data-label='Add to cart'>Add to cart</button></div></div>");
+    var c=el("<div class='boko-cart__slide' role='group' aria-label='"+esc(p.title)+"'><a class='boko-cart__img' aria-label='"+esc(p.title)+"'></a><div class='boko-cart__info'><div class='boko-cart__row1'><span class='boko-cart__title'></span><span class='boko-cart__price'></span></div><div class='boko-cart__opts'></div><button type='button' class='boko-cart__add' aria-label='Add "+esc(p.title)+" to cart' data-label='Add to cart'>Add to cart</button></div></div>");
     var imgA=c.querySelector(".boko-cart__img");
     if(p.img){imgA.innerHTML="<img loading='lazy' src='"+p.img+"' alt=''>";}
     else{imgA.innerHTML="<div style='width:84px;height:112px;background:#f3f1ee;border-radius:4px'></div>";}
@@ -238,17 +245,17 @@ function showCart(json){
           opt.values.forEach(function(val){
             var b=document.createElement("button");b.type="button";
             var on=sel[oi]===val,av=valAvail(p,oi,val,sel);
-            b.className="boko-cart__sw"+(on?" is-sel":"")+(av?"":" is-oos");b.textContent=val;
+            b.className="boko-cart__sw"+(on?" is-sel":"")+(av?"":" is-oos");b.textContent=val;a11yOptions(row,opt,b,val,on,av);
             b.addEventListener("click",function(){if(!av&&!on)return;sel[oi]=val;var v=variantFor(p,sel);if(v){vid=v.id;priceEl.textContent=money(v.price);atc.disabled=!v.available;atc.textContent=v.available?"Add to cart":"Sold out";}draw();});
             row.appendChild(b);
           });
           optsEl.appendChild(row);
         });
-        var cur=variantFor(p,sel);if(cur){atc.disabled=!cur.available;atc.textContent=cur.available?"Add to cart":"Sold out";}
+        var cur=variantFor(p,sel);if(cur){atc.disabled=!cur.available;atc.textContent=cur.available?"Add to cart":"Sold out";a11yAdd(atc,p,cur);}
       };
       draw();
     }
-    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"cart_drawer"},this,p.handle);});
+    atc.addEventListener("click",function(){if(this.disabled)return;addToCart(vid,{key:"_boko_reco",value:"cart_drawer"},this,p.handle,p.title);});
     return c;
   }
   function findCartHost(){for(var i=0;i<CART_HOSTS.length;i++){var e=document.querySelector(CART_HOSTS[i]);if(e)return e;}return null;}
@@ -281,18 +288,18 @@ function showCart(json){
       if(!items.length){track.innerHTML="<div class='boko-cart__empty'>No recommendations right now.</div>";if(prev)prev.style.display="none";if(next)next.style.display="none";return;}
       items.forEach(function(p){track.appendChild(cartCard(p));});
       var idx=0,n=items.length;
-      function upd(){track.style.transform="translateX(-"+(idx*100)+"%)";if(prev)prev.disabled=idx===0;if(next)next.disabled=idx===n-1;if(dotsEl){var ds=dotsEl.children;for(var k=0;k<ds.length;k++){ds[k].className="boko-cart__dot"+(k===idx?" is-on":"");}}}
+      function upd(){track.style.transform="translateX(-"+(idx*100)+"%)";if(prev)prev.disabled=idx===0;if(next)next.disabled=idx===n-1;if(dotsEl){var ds=dotsEl.children;for(var k=0;k<ds.length;k++){ds[k].className="boko-cart__dot"+(k===idx?" is-on":"");if(k===idx)ds[k].setAttribute("aria-current","true");else ds[k].removeAttribute("aria-current");}}}
       function go(i){idx=Math.max(0,Math.min(n-1,i));upd();}
       var single=n<=1;
       if(prev)prev.style.display=single?"none":"";
       if(next)next.style.display=single?"none":"";
-      if(dotsEl&&!single){for(var k2=0;k2<n;k2++){(function(j){var dot=document.createElement("button");dot.type="button";dot.className="boko-cart__dot"+(j===0?" is-on":"");dot.addEventListener("click",function(){go(j);});dotsEl.appendChild(dot);})(k2);}}
+      if(dotsEl&&!single){for(var k2=0;k2<n;k2++){(function(j){var dot=document.createElement("button");dot.type="button";dot.className="boko-cart__dot"+(j===0?" is-on":"");dot.setAttribute("aria-label","Show recommendation "+(j+1)+" of "+n+": "+(items[j].title||""));dot.addEventListener("click",function(){go(j);});dotsEl.appendChild(dot);})(k2);}}
       if(prev)prev.onclick=function(){go(idx-1);};
       if(next)next.onclick=function(){go(idx+1);};
       go(0);
     }).catch(function(){track.innerHTML="<div class='boko-cart__empty'>Couldn't load.</div>";});
   }
-  function cartRootHTML(){return "<div class='boko-cart' data-boko-cart><p class='boko-cart__h'>You may also like</p><div class='boko-cart__vp'><button class='boko-cart__nav boko-cart__prev' type='button' aria-label='Previous'>&#8249;</button><div class='boko-cart__track' data-row></div><button class='boko-cart__nav boko-cart__next' type='button' aria-label='Next'>&#8250;</button></div><div class='boko-cart__dots' data-dots></div></div>";}
+  function cartRootHTML(){return "<div class='boko-cart' data-boko-cart role='region' aria-label='You may also like'><p class='boko-cart__h'>You may also like</p><div class='boko-cart__vp'><button class='boko-cart__nav boko-cart__prev' type='button' aria-label='Previous recommendation'>&#8249;</button><div class='boko-cart__track' data-row></div><button class='boko-cart__nav boko-cart__next' type='button' aria-label='Next recommendation'>&#8250;</button></div><div class='boko-cart__dots' data-dots></div>"+SR_HTML+"</div>";}
   var BOKO_BUSY=false;var BOKO_MO=null;
   function bokoDedupeCC(){var d=document.querySelectorAll("[data-boko-cc]");for(var q=0;q<d.length;q++){if(d[q].parentNode)d[q].parentNode.removeChild(d[q]);}}
   function injectCart(){
